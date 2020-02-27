@@ -4,6 +4,9 @@ Import ListNotations.
 Require Import Nat.
 Require Import Arith.
 
+(** Lazy evaluation notation *)
+
+(** Sus suspends evaluation of x and memorize it *)
 Inductive Suspend {T : Type} :=
   Sus of T.
 
@@ -14,13 +17,19 @@ Definition force {T : Type} (x : @Suspend T) : T :=
   ($ y)  => y
   end.
 
-Print Suspend.
-
 Inductive StreamCell {T : Type} :=
   | Nil
   | Cons (x : T) (S : @Suspend (@StreamCell  T)).
   
 Definition Stream {T : Type} := @Suspend (@StreamCell T).
+
+(** TODO: fix definitiom of Stream with "with" *)
+
+(* Inductive StreamCell {T : Type} :=
+  | Nil
+  | Cons (x : T) (S : Stream)
+  with  Stream {T : Type} := @Suspend ( @StreamCell T).
+ *)
 
 Fixpoint append {T : Type} (s t : @Stream T) {struct s} : @Stream T :=
   $ match s with
