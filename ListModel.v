@@ -26,8 +26,7 @@ Module STACK.
   }.
   Structure type := Pack { sort : Type -> Type; class_of : class sort }.
 
-  Section Operations.
-
+  Section Exports. 
     Local Coercion sort : type >-> Funclass.
     Variables T : Type.
     Variables stack : type.
@@ -49,32 +48,59 @@ Module STACK.
 
     Definition spec_len : forall (st : stack T), length (tail st) = (length st).-1
     := Spec_len (class_of stack).
+
+  End Exports.
     
+  Arguments cons {_ _}.
+  Arguments length {_ _}.
+  Arguments tail {_ _}.
+  Arguments head {_ _}.
+  Arguments empty {_ _}.
+  Arguments isEmpty {_ _}.
+  Arguments spec_isEmpty {_ _}.
+  Arguments spec_len {_ _}.
+
+  Section Operations.
+    Variables stack : type.
+
+    Coercion sort : type >-> Funclass.
+
+      (** TODO: ssreflect proof *)
+      Program Fixpoint append {T : Type} (st1 st2 : stack T) {measure (length st1)} : stack T :=
+        if (isEmpty st1) is true then st2 else 
+        if head st1 is Some x then cons x (append (tail st1) st2)
+        else st1.
+      Next Obligation.
+      Proof.    
+        - rewrite spec_len.
+          assert (length st1 <> 0).
+          move=> se; apply: H. symmetry.
+          by apply spec_isEmpty.
+        by lia.
+      Qed.
+
+      Notation "st1 ++ st2" := (append st1 st2) (at level 60, right associativity).
+      
+      (* Returns empty if cannot update *)
+      Fixpoint update {T : Type} (st : stack T) (i : nat) (x : T) {struct i} : stack T :=
+        if isEmpty st is true then empty else
+        if i is i'.+1 then 
+        update (tail st) i' x else
+        cons x (tail st).
+
     (** TODO: ssreflect proof *)
-    Program Fixpoint append (st1 st2 : stack T)
-    {measure (length st1)} : stack T :=
-      if (isEmpty st1) is true then st2 else 
-      if head st1 is Some x then cons x (append (tail st1) st2)
-      else st1.
+    Program Fixpoint suffixes {T : Type} (st : stack T) {measure (length st)} : stack (stack T) :=
+      if isEmpty st is true then empty else cons st (suffixes (tail st)).
     Next Obligation.
-    Proof.    
+    Proof.
       - rewrite spec_len.
-        assert (length st1 <> 0).
+        assert (length st <> 0).
         move=> se; apply: H. symmetry.
         by apply spec_isEmpty.
       by lia.
     Qed.
 
-    Notation "st1 ++ st2" := (append st1 st2) (at level 60, right associativity).
-    
-    (* Returns empty if cannot update *)
-    Fixpoint update (st : stack T) (i : nat) (x : T)
-      {struct i} : stack T :=
-      if isEmpty st is true then empty else
-      if i is i'.+1 then 
-      update (tail st) i' x else
-      cons x (tail st).
-  
   End Operations.
+  
 End STACK.
 (** TODO: instanses *)
