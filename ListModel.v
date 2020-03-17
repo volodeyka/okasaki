@@ -60,37 +60,42 @@ Module STACK.
   Arguments spec_isEmpty {_ _}.
   Arguments spec_len {_ _}.
 
+  Notation "x :: y" := (cons x y)
+                     (at level 60, right associativity).
+  Notation "[ ]" := empty.
+  Notation "[ x ; .. ; y ]" := (cons x .. (cons y []) ..).
+
   Section Operations.
     Variables stack : type.
 
     Coercion sort : type >-> Funclass.
 
-      (** TODO: ssreflect proof *)
-      Program Fixpoint append {T : Type} (st1 st2 : stack T) {measure (length st1)} : stack T :=
-        if (isEmpty st1) is true then st2 else 
-        if head st1 is Some x then cons x (append (tail st1) st2)
-        else st1.
-      Next Obligation.
-      Proof.    
-        - rewrite spec_len.
-          assert (length st1 <> 0).
-          move=> se; apply: H. symmetry.
-          by apply spec_isEmpty.
-        by lia.
-      Qed.
-
-      Notation "st1 ++ st2" := (append st1 st2) (at level 60, right associativity).
-      
-      (* Returns empty if cannot update *)
-      Fixpoint update {T : Type} (st : stack T) (i : nat) (x : T) {struct i} : stack T :=
-        if isEmpty st is true then empty else
-        if i is i'.+1 then 
-        update (tail st) i' x else
-        cons x (tail st).
-
     (** TODO: ssreflect proof *)
+    Program Fixpoint append {T : Type} (st1 st2 : stack T) {measure (length st1)} : stack T :=
+      if (isEmpty st1) is true then st2 else 
+      if head st1 is Some x then x :: (append (tail st1) st2)
+      else st1.
+    Next Obligation.
+    Proof.    
+      - rewrite spec_len.
+        assert (length st1 <> 0).
+        move=> se; apply: H. symmetry.
+        by apply spec_isEmpty.
+      by lia.
+    Qed.
+
+    Notation "st1 ++ st2" := (append st1 st2) (at level 60, right associativity).
+    
+    (* Returns empty if cannot update *)
+    Fixpoint update {T : Type} (st : stack T) (i : nat) (x : T) {struct i} : stack T :=
+      if isEmpty st is true then [] else
+      if i is i'.+1 then 
+      update (tail st) i' x else
+      x :: (tail st).
+
+  (** TODO: ssreflect proof *)
     Program Fixpoint suffixes {T : Type} (st : stack T) {measure (length st)} : stack (stack T) :=
-      if isEmpty st is true then empty else cons st (suffixes (tail st)).
+      if isEmpty st is true then [] else st :: (suffixes (tail st)).
     Next Obligation.
     Proof.
       - rewrite spec_len.
