@@ -20,7 +20,7 @@ Module STACK.
 
     (* for proofs *)
     Length {T : Type} : stack T -> nat;
-    Spec_isEmpty {T : Type} : 
+    Spec_isEmpty {T : Type} :
         forall (st : stack T), (IsEmpty st = true) <-> Length st = 0;
     Spec_len {T : Type} : forall (st : stack T), Length (Tail st) = (Length st).-1
   }.
