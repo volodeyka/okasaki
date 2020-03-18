@@ -54,7 +54,43 @@ Arguments Class {_}.
 
 End SET.
 
+Module FINITEMAP.
+  Record class (Map : Type -> Type) := Class
+  {
+    KEY : Type;
+
+    Empty {T : Type} : Map T ;
+    Bind {T : Type} : KEY -> T -> Map T -> Map T;
+    Lookup {T : Type} : KEY -> Map T -> option T
+  }.
+  Structure type := Pack { sort : Type -> Type; class_of : class sort }.
+
+  Section Exports.
+
+  Coercion sort : type >-> Funclass.
+
+  Variables (M : type).
+  Definition Key : Type := KEY (class_of M).
+
+  Variables (T : Type).
+  Definition empty : M T := Empty (class_of M).
+  Definition lookup : Key -> M T -> option T := Lookup (class_of M).
+  Definition bind : Key -> T -> M T -> M T := Bind (class_of M).
+  
+  End Exports.
+
+  (*Arguments Key {_}.
+  Arguments empty {_ _}.
+  Arguments lookup {_ _}.
+  Arguments bind {_ _}.*)
+  Arguments Class {_}.
+
+End FINITEMAP.
+
 Export ORDERED.
+
+Module BINSRCTREE_SET.
+
 
 Section TreeDef.
 Variables Elem : ordType.
@@ -198,7 +234,53 @@ Arguments Tree   {_}.
 Arguments member {_}.
 Arguments insert {_}.
 Arguments empty {_}.
-Print SET.Pack.
 
 Definition UnbalancedClass (Elem : ordType) : SET.class Tree := SET.Class Elem empty insert member.
 Canonical UnbalancedSet (Elem : ordType) : SET.type := SET.Pack (UnbalancedClass Elem).
+End BINSRCTREE_SET.
+
+Module BINSRCTREE_MAP.
+
+Section FinMapDef.
+Variables (Key : ordType) (A : Type).
+
+Inductive Tree :=
+| E : Tree
+| T : Tree -> Key -> A -> Tree -> Tree.
+
+Fixpoint bind (k : Key) (x : A) (Tr : Tree) : Tree :=
+  if Tr is T a k' y b then
+    if lt k k' then
+       T (bind k x a) k' y b
+    else 
+      if lt k' k then
+        T a k' y (bind k x b)
+      else 
+        T a k' y b
+  else
+    T E k x E.
+  
+Fixpoint lookup (k : Key) (Tr : Tree) : option A :=
+  if Tr is T a k' y b then
+    if lt k k' then
+      lookup k a
+    else
+      if lt k' k then
+        lookup k b
+      else Some y
+  else None.
+
+  Definition empty := E.
+
+End FinMapDef.
+
+Arguments Tree {_}.
+Arguments bind {_}.
+Arguments lookup {_}.
+Arguments empty {_}.
+
+Definition UnbalancedMap (Key : ordType) : FINITEMAP.class Tree :=
+  FINITEMAP.Class Key empty bind lookup.
+Canonical UnbalancedSet (Key : ordType) : FINITEMAP.type := FINITEMAP.Pack (UnbalancedMap Key).
+
+End BINSRCTREE_MAP.
