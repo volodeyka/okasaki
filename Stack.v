@@ -62,7 +62,7 @@ Module STACK.
 
   Notation "x :: y" := (cons x y)
                      (at level 60, right associativity).
-  Notation "[ ]" := empty.
+  Notation "[]" := empty.
   Notation "[ x ; .. ; y ]" := (cons x .. (cons y []) ..).
 
   Section Operations.

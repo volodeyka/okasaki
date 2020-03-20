@@ -1,6 +1,7 @@
 From mathcomp Require Import ssreflect ssrbool ssrnat.
-Require Import Lia.
 
+Require Coq.Program.Tactics.
+Require Coq.Program.Wf.
 Set Implicit Arguments.
 
 Module ORDERED.
@@ -216,7 +217,7 @@ Fixpoint div2 (n : nat) :=
   | S (S n) => div2 n
   | _       => O
   end.
-
+(* TODO ?mesure? *)
 Program Fixpoint create (x : Elem) (m : nat) {mesure m} : Tree :=
   if m is m'.+1 then
     let n := div2 m' in

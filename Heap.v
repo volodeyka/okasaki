@@ -251,7 +251,339 @@ Canonical WBLeftistHeap (Elem : ordType) : HEAP.type :=
   HEAP.Pack (WBLeftistClass Elem).
 End WBLIFTISTHEAP.
 
+Module BINOMHEAP.
+  Section BinomHeap.
+  Variables (Elem : ordType).
+
+  Inductive Tree :=
+  | Node : nat -> Elem -> list Tree -> Tree.
+
+  Definition Heap := list Tree.
+  Definition empty : Heap := [].
+  
+
+  Definition rank := fun '(Node r x c) => r.
+  Definition root := fun '(Node r x c) => x.
+
+  Fixpoint rk (Tr : Tree) :=
+  match Tr with Node _ x c =>
+  if c is h :: _ then (rk h).+1 else 1 end.
+
+  Definition link (t1 t2 : Tree) : Tree :=
+    match t1, t2 with 
+    | Node r x1 c1, Node _ x2 c2 =>
+    if leq x1 x2 then 
+      Node r.+1 x1 (t2 :: c1)
+    else Node r.+1 x2 (t1 :: c2)
+    end.
+  
+  Fixpoint insTree (t : Tree) (ts : Heap) :=
+    match t, ts with 
+    | t, []        => [t]
+    | t, t' :: ts' => if (rank t) < (rank  t') then
+                        t :: ts
+                      else  insTree (link t t') ts'
+    end.
+
+  Definition insert (x : Elem) (ts : Heap) := insTree (Node 0 x []) ts.
+
+  Fixpoint size (ts : Heap) : nat :=
+    if ts is t :: ts' then (rk t) + size ts' else O.
+
+   (*Lemma arismeticts1 (n m l k : nat) (H : n > 0) : 
+     (k + (m + l) < n + k + (m + l))%coq_nat.
+   Proof.
+     Search Peano.lt.
+     rewrite <- addnA.
+     apply Nat.lt_add_pos_l.
+   Qed.*)
+   Lemma pos_rk (t : Tree) : (0 < (rk t))%coq_nat.
+   Proof.
+     induction t.
+     case l; simpl.
+     - by [].
+       move=> t l'.
+       lia.
+   Qed.
+
+
+  Program Fixpoint merge (ts1 ts2 : Heap) {measure (size ts1 + size ts2)} : Heap :=
+    match ts1, ts2 with
+    | t, [] => t
+    | [], t => t
+    | t1 :: ts'1, t2 :: ts'2 => 
+      if (rank t1 < rank t2) is true then
+        t1 :: (merge ts'1 ts2)
+      else
+        if rank t2 < rank t1 is true then
+          t2 :: (merge ts1 ts'2)
+        else insTree (link t1 t2) (merge ts'1 ts'2)
+    end.
+    Next Obligation. 
+      simpl.
+      rewrite <- addnA.
+      apply: (Nat.lt_add_pos_l _ _ (pos_rk t1)).
+    Qed.
+    Next Obligation.
+      simpl.
+      replace (rk t1 + size ts'1 + (rk t2 + size ts'2)) with
+               (rk t1 + size ts'1 + size ts'2 + rk t2).
+      - apply: (Nat.lt_add_pos_r _ _ (pos_rk t2)).
+        replace (rk t2 + size ts'2) with (size ts'2 + rk t2).
+        - rewrite addnA; by [].
+          by rewrite addnC.
+    Qed.
+    Next Obligation.
+      simpl.
+      replace (rk t1 + size ts'1 + (rk t2 + size ts'2)) with
+               ((size ts'1 + size ts'2) + (rk t1 + rk t2)).
+      - apply Nat.lt_add_pos_r. 
+        apply Nat.add_pos_pos; apply pos_rk.
+        replace (rk t1 + size ts'1) with (size ts'1 + rk t1).
+        rewrite <- addnA. rewrite <- addnA.
+        apply Nat.add_cancel_l.
+        rewrite addnC. rewrite <- addnA.
+        by apply Nat.add_cancel_l.
+        by rewrite addnC.
+    Qed.
+
+    Fixpoint removeMinTree (ts : Heap) : option (Tree * Heap) :=
+      match ts with
+      | []      => None
+      | [t]     => Some (t, [])
+      | t :: ts =>  if removeMinTree ts is Some (t', ts') then
+                      if leq (root t) (root t') then
+                        Some (t, ts) 
+                      else Some (t', t :: ts)
+                    else None
+      end.
+
+    Definition findMin (ts : Heap) : option Elem :=
+      if (removeMinTree ts) is Some (t, _) then Some (root t) else None.
+    
+    Definition deleteMin (ts : Heap) : Heap :=
+      if (removeMinTree ts) is Some (Node _ x ts1, ts2) then
+        (merge (rev ts1) ts2)
+      else [].
+    
+    Fixpoint findMin' (ts : Heap) : option Elem :=
+      match ts with
+      | [] => None
+      | [Node _ y _] => Some y
+      | (Node _ y _) :: ts' => 
+                    if findMin ts' is Some x then
+                      if lt x y then 
+                        Some x
+                      else Some y
+                    else None
+      end.
+
+    Definition isEmpty (ts : Heap) :=
+      if ts is [] then true else false.
+  End BinomHeap.
+
+Arguments Heap      {_}.
+Arguments insert    {_}.
+Arguments merge     {_}.
+Arguments isEmpty   {_}.
+Arguments findMin   {_}.
+Arguments deleteMin {_}.
+Arguments empty     {_}.
+
+
+Definition BinomHeapClass (Elem : ordType) : HEAP.class Heap :=
+  HEAP.Class Elem empty isEmpty insert merge findMin deleteMin.
+Canonical BinomHeap (Elem : ordType) : HEAP.type :=
+  HEAP.Pack (BinomHeapClass Elem).
+End BINOMHEAP.
+
+Module BINOMHEAP_RK.
+  Section BinomHeap_rk.
+
+  Variables (Elem : ordType).
+  Inductive Tree :=
+  | Node : Elem -> list Tree -> Tree.
+
+  Definition Heap := list (nat * Tree).
+  Definition empty : Heap := [].
+
+  Definition root := fun '(Node x c) => x.
+
+  Fixpoint rk (Tr : Tree) :=
+  match Tr with Node x c =>
+  if c is h :: _ then (rk h).+1 else 1 end.
+
+  Definition link (t1 t2 : Tree) : Tree :=
+    match t1, t2 with 
+    | Node x1 c1, Node x2 c2 =>
+    if leq x1 x2 then 
+      Node x1 (t2 :: c1)
+    else Node x2 (t1 :: c2)
+    end.
+  
+  Fixpoint insTree (t : Tree) (ts : Heap) :=
+    match t, ts with 
+    | t, []        => [(rk t, t)]
+    | t, t' :: ts' => let rkt := rk t in
+                      if (rkt) < fst t' then
+                        (rkt, t) :: ts
+                      else  insTree (link t (snd t')) ts'
+    end.
+
+  Definition insert (x : Elem) (ts : Heap) := insTree (Node x []) ts.
+
+  Fixpoint size (ts : Heap) : nat :=
+    if ts is t :: ts' then (rk (snd t)) + size ts' else O.
+
+   (*Lemma arismeticts1 (n m l k : nat) (H : n > 0) : 
+     (k + (m + l) < n + k + (m + l))%coq_nat.
+   Proof.
+     Search Peano.lt.
+     rewrite <- addnA.
+     apply Nat.lt_add_pos_l.
+   Qed.*)
+   Lemma pos_rk (t : Tree) : (0 < (rk t))%coq_nat.
+   Proof.
+     induction t.
+     case l; simpl.
+     - by [].
+       move=> t l'.
+       lia.
+   Qed.
+
+
+  Program Fixpoint merge (ts1 ts2 : Heap) {measure (size ts1 + size ts2)} : Heap :=
+    match ts1, ts2 with
+    | t, [] => t
+    | [], t => t
+    | t1 :: ts'1, t2 :: ts'2 => 
+      if (fst t1 < fst t2) is true then
+        t1 :: (merge ts'1 ts2)
+      else
+        if fst t2 < fst t1 is true then
+          t2 :: (merge ts1 ts'2)
+        else insTree (link (snd t1) (snd t2)) (merge ts'1 ts'2)
+    end.
+    Next Obligation. 
+      simpl.
+      rewrite <- addnA.
+      apply: (Nat.lt_add_pos_l _ _ (pos_rk t0)).
+    Qed.
+    Next Obligation.
+      simpl.
+      replace (rk t0 + size ts'1 + (rk t + size ts'2)) with
+               (rk t0 + size ts'1 + size ts'2 + rk t).
+      - apply: (Nat.lt_add_pos_r _ _ (pos_rk t)).
+        replace (rk t + size ts'2) with (size ts'2 + rk t).
+        - rewrite addnA; by [].
+          by rewrite addnC.
+    Qed.
+    Next Obligation.
+      simpl.
+      replace (rk t0 + size ts'1 + (rk t + size ts'2)) with
+               ((size ts'1 + size ts'2) + (rk t0 + rk t)).
+      - apply Nat.lt_add_pos_r. 
+        apply Nat.add_pos_pos; apply pos_rk.
+        replace (rk t0 + size ts'1) with (size ts'1 + rk t0).
+        rewrite <- addnA. rewrite <- addnA.
+        apply Nat.add_cancel_l.
+        rewrite addnC. rewrite <- addnA.
+        by apply Nat.add_cancel_l.
+        by rewrite addnC.
+    Qed.
+
+    Fixpoint removeMinTree (ts : Heap) : option (Tree * Heap) :=
+      match ts with
+      | []      => None
+      | [t]     => Some (snd t, [])
+      | t :: ts =>  if removeMinTree ts is Some (t', ts') then
+                      if leq (root (snd t)) (root t') then
+                        Some ((snd t), ts) 
+                      else Some (t', t :: ts)
+                    else None
+      end.
+
+    Definition findMin (ts : Heap) : option Elem :=
+      if (removeMinTree ts) is Some (t, _) then Some (root t) else None.
+    
+    Fixpoint lTrevH (ts : list Tree) (r : nat) : Heap :=
+      match ts with
+      | [] => []
+      | t :: ts' => (lTrevH ts' r.-1) ++ [(r, t)]
+      end.
+
+    Definition deleteMin (ts : Heap) : Heap :=
+      if (removeMinTree ts) is Some (Node x ts1, ts2) then
+        if head ts1 is Some hts1 then
+          (merge (lTrevH ts1 (rk hts1)) ts2)
+        else ts2
+      else [].
+
+    Definition isEmpty (ts : Heap) :=
+      if ts is [] then true else false.
+
+
+  End BinomHeap_rk.
+
+  Arguments Heap      {_}.
+  Arguments insert    {_}.
+  Arguments merge     {_}.
+  Arguments isEmpty   {_}.
+  Arguments findMin   {_}.
+  Arguments deleteMin {_}.
+  Arguments empty     {_}.
+  
+  
+  Definition BinomHeaprkClass (Elem : ordType) : HEAP.class Heap :=
+    HEAP.Class Elem empty isEmpty insert merge findMin deleteMin.
+  Canonical BinomHeaprk (Elem : ordType) : HEAP.type :=
+    HEAP.Pack (BinomHeaprkClass Elem).  
+End BINOMHEAP_RK.
+
 Export HEAP.
+
+Section ExplicitMin.
+  Variables (H : type).
+
+  Definition Elem := (Elem H).
+
+  Inductive Heap := 
+  | E
+  | NE : Elem -> H -> Heap.
+  Print Heap.
+
+  Print insert.
+
+  Definition Insert (x : Elem) (h : Heap) :=
+    if h is NE y ts then
+      if lt x y
+        then NE x (insert H x ts)
+      else NE y (insert H x ts)
+    else NE x (insert H x (empty H)).
+
+  Definition Merge (h1 h2 : Heap) : Heap :=
+    match h1, h2 with
+    | E, h2 => h2
+    | h1, E => h1
+    | NE x h'1, NE y h'2 =>
+      if lt x y then
+        NE x (merge H h'1 h'2)
+      else NE y (merge H h'1 h'2)
+    end.
+
+  Definition DeleteMin (h1 : Heap) : Heap :=
+    if h1 is NE x h then
+       let h' := deleteMin H h in
+       if findMin H h' is Some y then
+         NE y h'
+       else E
+     else E.
+
+  Definition FindMin (h : Heap) : option Elem :=
+    if h is NE x h' then Some x else None.
+  
+End ExplicitMin.
+
 
 Section fromList.
 Variables (Heap : type).
