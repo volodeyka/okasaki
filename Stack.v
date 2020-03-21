@@ -1,5 +1,5 @@
-From mathcomp Require Import ssreflect ssrbool ssrnat.
-Require Import Lia.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat.
+Require Import Psatz.
 
 Require Coq.Program.Tactics.
 Require Coq.Program.Wf.
@@ -62,7 +62,7 @@ Module STACK.
 
   Notation "x :: y" := (cons x y)
                      (at level 60, right associativity).
-  Notation "[]" := empty.
+  Notation "[ ]" := empty.
   Notation "[ x ; .. ; y ]" := (cons x .. (cons y []) ..).
 
   Section Operations.
@@ -76,11 +76,9 @@ Module STACK.
       if head st1 is Some x then x :: (append (tail st1) st2)
       else st1.
     Next Obligation.
-    Proof.    
+    Proof.
       - rewrite spec_len.
-        assert (length st1 <> 0).
-        move=> se; apply: H. symmetry.
-        by apply spec_isEmpty.
+        have: (length st1 <> 0). by move/spec_isEmpty=> HH; apply: H.
       by lia.
     Qed.
 
@@ -98,11 +96,9 @@ Module STACK.
       if isEmpty st is true then [] else st :: (suffixes (tail st)).
     Next Obligation.
     Proof.
-      - rewrite spec_len.
-        assert (length st <> 0).
-        move=> se; apply: H. symmetry.
-        by apply spec_isEmpty.
-      by lia.
+    - rewrite spec_len.
+      have: (length st <> 0) by move/spec_isEmpty=> HH; apply: H.
+    by lia.
     Qed.
 
   End Operations.
