@@ -78,8 +78,7 @@ Module STACK.
     Next Obligation.
     Proof.
       - rewrite spec_len.
-        assert (length st1 <> 0).
-        - move/spec_isEmpty=> HH. by apply: H.
+        have: (length st1 <> 0). by move/spec_isEmpty=> HH; apply: H.
       by lia.
     Qed.
 
@@ -98,10 +97,9 @@ Module STACK.
     Next Obligation.
     Proof.
     - rewrite spec_len.
-      assert (length st <> 0).
-    - move/spec_isEmpty=> HH. by apply: H.
-  by lia.
-Qed.
+      have: (length st <> 0) by move/spec_isEmpty=> HH; apply: H.
+    by lia.
+    Qed.
 
   End Operations.
   
