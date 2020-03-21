@@ -227,15 +227,11 @@ Next Obligation.
   exact nat.
 Qed.
 
+Definition UnbalancedClass : SET.class Tree := SET.Class Elem empty insert member.
+Canonical UnbalancedSet : SET.type := SET.Pack UnbalancedClass.
 End TreeDef.
 
-Arguments Tree   {_}.
-Arguments member {_}.
-Arguments insert {_}.
-Arguments empty  {_}.
 
-Definition UnbalancedClass (Elem : ordType) : SET.class Tree := SET.Class Elem empty insert member.
-Canonical UnbalancedSet (Elem : ordType) : SET.type := SET.Pack (UnbalancedClass Elem).
 End BINSRCTREE_SET.
 
 Module BINSRCTREE_MAP.
@@ -311,15 +307,15 @@ Module REDBLACKSET.
       | C, a, x, b                   => T C a x b
       end.
     
-    Fixpoint ins (x : Elem) (s : Tree) : Tree :=
-      if s is T color a y b then
-        if lt x y then
-          balance color (ins x a) y b
-        else
-          if lt y x then
-            balance color a y (ins x b)
-          else s
-      else T R E x E.
+  Fixpoint ins (x : Elem) (s : Tree) : Tree :=
+    if s is T color a y b then
+      if lt x y then
+        balance color (ins x a) y b
+      else
+        if lt y x then
+          balance color a y (ins x b)
+        else s
+    else T R E x E.
   
   Definition insert (x : Elem) (s : Tree) :=
     if ins x s is T _ a y b then T B a y b else E.
@@ -350,6 +346,53 @@ Module REDBLACKSET.
 
   Definition fromOrdList (l : list Elem) : Tree := toTree E (ins' [] l).
 
+  Definition lbalance (C : Color) (a : Tree) (x : Elem) (b : Tree) : Tree :=
+  match C, a, x, b with
+  | B, T R (T R a x b) y c, z, d => T R (T  B a x b) y (T B c z d)
+  | B, T R a x (T R b y c), z, d => T R (T  B a x b) y (T B c z d)
+  | C, a, x, b                   => T C a x b
+  end.
+
+  Definition rbalance (C : Color) (a : Tree) (x : Elem) (b : Tree) : Tree :=
+  match C, a, x, b with
+  | B, a, x, T R (T R b y c) z d => T R (T  B a x b) y (T B c z d)
+  | B, a, x, T R b y (T R c z d) => T R (T  B a x b) y (T B c z d) 
+  | C, a, x, b                   => T C a x b
+  end.
+
+  Fixpoint insrl (x : Elem) (s : Tree) : Tree :=
+  if s is T color a y b then
+    if lt x y then
+      lbalance color (insrl x a) y b
+    else
+      if lt y x then
+        rbalance color a y (insrl x b)
+      else s
+  else T R E x E.
+
+  Definition insertrl (x : Elem) (s : Tree) :=
+    if insrl x s is T _ a y b then T B a y b else E.
   
+  Definition balance'' (C : Color) (a : Tree) (x : Elem) (b : Tree) : Tree :=
+  match C, a, x, b with
+    | B, T R (T R a x b) y c, z, d => T R (T  B a x b) y (T B c z d) 
+    | C, a, x, b                     => T C a x b
+    end.
+
+  Fixpoint ins'' (x : Elem) (s : Tree) : Tree :=
+    if s is T color a y b then
+      if lt x y then
+        balance'' color (ins'' x a) y b
+      else
+        if lt y x then
+          balance'' color (ins'' x b) y a
+        else s
+    else T R E x E.
+  
+  Definition insert' (x : Elem) (s : Tree) :=
+    if ins'' x s is T _ a y b then T B a y b else E.
+
+Definition RedBlackClass : SET.class Tree := SET.Class Elem E insert member.
+Canonical RedBlackSet : SET.type := SET.Pack RedBlackClass.
   End RedBlackSet.
 End REDBLACKSET.

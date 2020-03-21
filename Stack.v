@@ -70,7 +70,6 @@ Module STACK.
 
     Coercion sort : type >-> Funclass.
 
-    (** TODO: ssreflect proof *)
     Program Fixpoint append {T : Type} (st1 st2 : stack T) {measure (length st1)} : stack T :=
       if (isEmpty st1) is true then st2 else 
       if head st1 is Some x then x :: (append (tail st1) st2)
@@ -91,7 +90,6 @@ Module STACK.
       update (tail st) i' x else
       x :: (tail st).
 
-  (** TODO: ssreflect proof *)
     Program Fixpoint suffixes {T : Type} (st : stack T) {measure (length st)} : stack (stack T) :=
       if isEmpty st is true then [] else st :: (suffixes (tail st)).
     Next Obligation.
@@ -104,4 +102,11 @@ Module STACK.
   End Operations.
   
 End STACK.
+Module List.
+Section (T : Type).
+
+Section List.
+End List.
+
+
 (** TODO: instanses *)

@@ -105,21 +105,12 @@ the shortest path to an empty node.*)
           T 1 x h' E
         else T n y (insert' x a) b
       else T 1 x E E.
+
+  Definition LeftistClass : HEAP.class Heap :=
+    HEAP.Class Elem E isEmpty insert merge findMin deleteMin.
+  Canonical LeftistHeap : HEAP.type :=
+    HEAP.Pack LeftistClass.
   End LeftistDef.
-
-Arguments Heap      {_}.
-Arguments insert    {_}.
-Arguments merge     {_}.
-Arguments isEmpty   {_}.
-Arguments findMin   {_}.
-Arguments deleteMin {_}.
-Arguments E         {_}.
-
-Definition LeftistClass (Elem : ordType) : HEAP.class Heap :=
-  HEAP.Class Elem E isEmpty insert merge findMin deleteMin.
-Canonical LeftistHeap (Elem : ordType) : HEAP.type :=
-  HEAP.Pack (LeftistClass Elem).
-
 End LIFTISTHEAP.
 Module WBLIFTISTHEAP.
 (*Weight-biased leftist heaps are an al-
@@ -211,20 +202,12 @@ right sibling.*)
     move=> /=;
     rewrite -!plusE; lia.
     Qed.
+
+  Definition WBLeftistClass : HEAP.class Heap :=
+    HEAP.Class Elem E isEmpty insert merge findMin deleteMin.
+  Canonical WBLeftistHeap : HEAP.type :=
+    HEAP.Pack WBLeftistClass.
   End WBLeftistDef.
-
-Arguments Heap      {_}.
-Arguments insert    {_}.
-Arguments merge     {_}.
-Arguments isEmpty   {_}.
-Arguments findMin   {_}.
-Arguments deleteMin {_}.
-Arguments E         {_}.
-
-Definition WBLeftistClass (Elem : ordType) : HEAP.class Heap :=
-  HEAP.Class Elem E isEmpty insert merge findMin deleteMin.
-Canonical WBLeftistHeap (Elem : ordType) : HEAP.type :=
-  HEAP.Pack (WBLeftistClass Elem).
 End WBLIFTISTHEAP.
 
 Module BINOMHEAP.
@@ -338,21 +321,12 @@ Module BINOMHEAP.
 
     Definition isEmpty (ts : Heap) :=
       if ts is [] then true else false.
+
+  Definition BinomHeapClass : HEAP.class Heap :=
+    HEAP.Class Elem empty isEmpty insert merge findMin deleteMin.
+  Canonical BinomHeap : HEAP.type :=
+    HEAP.Pack BinomHeapClass.
   End BinomHeap.
-
-Arguments Heap      {_}.
-Arguments insert    {_}.
-Arguments merge     {_}.
-Arguments isEmpty   {_}.
-Arguments findMin   {_}.
-Arguments deleteMin {_}.
-Arguments empty     {_}.
-
-
-Definition BinomHeapClass (Elem : ordType) : HEAP.class Heap :=
-  HEAP.Class Elem empty isEmpty insert merge findMin deleteMin.
-Canonical BinomHeap (Elem : ordType) : HEAP.type :=
-  HEAP.Pack (BinomHeapClass Elem).
 End BINOMHEAP.
 
 Module BINOMHEAP_RK.
@@ -463,23 +437,12 @@ Module BINOMHEAP_RK.
 
     Definition isEmpty (ts : Heap) :=
       if ts is [] then true else false.
-
-
-  End BinomHeap_rk.
-
-  Arguments Heap      {_}.
-  Arguments insert    {_}.
-  Arguments merge     {_}.
-  Arguments isEmpty   {_}.
-  Arguments findMin   {_}.
-  Arguments deleteMin {_}.
-  Arguments empty     {_}.
   
-  
-  Definition BinomHeaprkClass (Elem : ordType) : HEAP.class Heap :=
+  Definition BinomHeaprkClass : HEAP.class Heap :=
     HEAP.Class Elem empty isEmpty insert merge findMin deleteMin.
-  Canonical BinomHeaprk (Elem : ordType) : HEAP.type :=
-    HEAP.Pack (BinomHeaprkClass Elem).  
+  Canonical BinomHeaprk : HEAP.type :=
+    HEAP.Pack BinomHeaprkClass.  
+  End BinomHeap_rk.
 End BINOMHEAP_RK.
 
 Export HEAP.
