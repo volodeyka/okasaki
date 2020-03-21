@@ -77,9 +77,15 @@ Module STACK.
       else st1.
     Next Obligation.
     Proof.
-      - rewrite spec_len.
+      - rewrite spec_len /=.
+        unfold lt.
+        Pr Bool.reflect.
+         leP.
+        Check ltn_predL.
+        Search _ le leq.
         assert (length st1 <> 0).
-        - move/spec_isEmpty=> HH. by apply: H.
+        move=> se; apply: H. symmetry.
+        by apply spec_isEmpty.
       by lia.
     Qed.
 
@@ -97,11 +103,12 @@ Module STACK.
       if isEmpty st is true then [] else st :: (suffixes (tail st)).
     Next Obligation.
     Proof.
-    - rewrite spec_len.
-      assert (length st <> 0).
-    - move/spec_isEmpty=> HH. by apply: H.
-  by lia.
-Qed.
+      - rewrite spec_len.
+        assert (length st <> 0).
+        move=> se; apply: H. symmetry.
+        by apply spec_isEmpty.
+      by lia.
+    Qed.
 
   End Operations.
   

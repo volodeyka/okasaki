@@ -1,5 +1,9 @@
 From mathcomp Require Import ssreflect ssrbool ssrnat.
-Require Import Lia.
+Require Import Psatz.
+Require Coq.Program.Tactics.
+Require Coq.Program.Wf.
+From Coq Require Import Lists.List.
+Import ListNotations.
 
 Set Implicit Arguments.
 
@@ -79,10 +83,6 @@ Module FINITEMAP.
   
   End Exports.
 
-  (*Arguments Key {_}.
-  Arguments empty {_ _}.
-  Arguments lookup {_ _}.
-  Arguments bind {_ _}.*)
   Arguments Class {_}.
 
 End FINITEMAP.
@@ -90,7 +90,6 @@ End FINITEMAP.
 Export ORDERED.
 
 Module BINSRCTREE_SET.
-
 
 Section TreeDef.
 Variables Elem : ordType.
@@ -233,7 +232,7 @@ End TreeDef.
 Arguments Tree   {_}.
 Arguments member {_}.
 Arguments insert {_}.
-Arguments empty {_}.
+Arguments empty  {_}.
 
 Definition UnbalancedClass (Elem : ordType) : SET.class Tree := SET.Class Elem empty insert member.
 Canonical UnbalancedSet (Elem : ordType) : SET.type := SET.Pack (UnbalancedClass Elem).
@@ -284,3 +283,73 @@ Definition UnbalancedMap (Key : ordType) : FINITEMAP.class Tree :=
 Canonical UnbalancedSet (Key : ordType) : FINITEMAP.type := FINITEMAP.Pack (UnbalancedMap Key).
 
 End BINSRCTREE_MAP.
+
+Module REDBLACKSET.
+  Section RedBlackSet.
+  Variables Elem : ordType.
+  
+  Inductive Color : Type := R | B.
+
+  Inductive Tree := E | T : Color -> Tree -> Elem -> Tree -> Tree.
+
+  Fixpoint member (x : Elem) (Tr : Tree) : bool :=
+    if Tr is T _ a y b then
+      if lt x y then
+        member x a
+      else 
+        if lt y x then
+          member x b
+        else true
+    else false.
+  
+    Definition balance (C : Color) (a : Tree) (x : Elem) (b : Tree) : Tree :=
+      match C, a, x, b with
+      | B, T R (T R a x b) y c, z, d => T R (T  B a x b) y (T B c z d)
+      | B, T R a x (T R b y c), z, d => T R (T  B a x b) y (T B c z d)
+      | B, a, x, T R (T R b y c) z d => T R (T  B a x b) y (T B c z d)
+      | B, a, x, T R b y (T R c z d) => T R (T  B a x b) y (T B c z d) 
+      | C, a, x, b                   => T C a x b
+      end.
+    
+    Fixpoint ins (x : Elem) (s : Tree) : Tree :=
+      if s is T color a y b then
+        if lt x y then
+          balance color (ins x a) y b
+        else
+          if lt y x then
+            balance color a y (ins x b)
+          else s
+      else T R E x E.
+  
+  Definition insert (x : Elem) (s : Tree) :=
+    if ins x s is T _ a y b then T B a y b else E.
+  
+  Program Fixpoint balance' (l : list (Color * Elem * Tree)) {measure (length l)} : list (Color * Elem * Tree) :=
+    match l with 
+    | [(R, v1, t1)] => [(B, v1, t1)]
+    | (R, v1, t1) :: (R, v2, t2) :: (B, v3, t3) :: xs => 
+      (B, v1, t1) :: (balance' ((R, v2, (T B t3 v3 t2)) :: xs))
+    | xs => xs
+    end.
+  Next Obligation.
+    by move=> /=; lia.
+  Qed.
+  Solve All Obligations with done.
+
+  Fixpoint ins' (ts : list (Color * Elem * Tree)) (l : list Elem) :=
+  match ts, l with 
+  | ts, x :: xs => ins' (balance' ((R, x, E)::ts)) xs
+  | ts, [] => ts
+  end.
+
+  Fixpoint toTree (Tr : Tree) (l : list (Color * Elem * Tree)) : Tree :=
+  match Tr, l with 
+  | t, [] => t
+  | t, (color, v, t') :: ts => toTree (T color t' v t) ts
+  end.
+
+  Definition fromOrdList (l : list Elem) : Tree := toTree E (ins' [] l).
+
+  
+  End RedBlackSet.
+End REDBLACKSET.
