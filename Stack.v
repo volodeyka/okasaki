@@ -102,11 +102,5 @@ Module STACK.
   End Operations.
   
 End STACK.
-Module List.
-Section (T : Type).
-
-Section List.
-End List.
-
 
 (** TODO: instanses *)
