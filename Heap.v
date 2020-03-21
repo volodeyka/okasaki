@@ -1,6 +1,5 @@
 From mathcomp Require Import ssreflect ssrbool ssrnat.
-Require Import Lia.
-Require Import Omega.
+Require Import Psatz.
 Require Import Arith.
 Require Coq.Program.Tactics.
 Require Coq.Program.Wf.
@@ -83,11 +82,8 @@ the shortest path to an empty node.*)
           makeT y a2 (merge h1 b2)
       end.
     Next Obligation.
-    Print Nat.add_lt_le_mono.
-      simpl. rewrite addnC. 
-      replace ((rk b1).+1 + (rk b2).+1) with ((rk b2).+1 + (rk b1).+1).
-      - apply Nat.add_lt_le_mono; lia.
-      by rewrite addnC. 
+      rewrite addnC (addnC (rk b1).+1 (rk b2).+1).
+      by apply: Nat.add_lt_le_mono; lia.
     Qed.
     
     Definition insert (x : Elem) (h : Heap) := 
@@ -150,33 +146,6 @@ right sibling.*)
 
   Definition isEmpty (h : Heap) :=
   if h is E then true else false.
-
-  Lemma arithmetics1 (n m k l : nat) : 
-   (n + (m + k + 1) < n + l + 1 + (m + k + 1))%coq_nat.
-  Proof.
-    simpl. 
-    replace (n + l + 1 + (m + k + 1))
-    with ((l + 1) + (n + (m + k + 1))).
-    Print Nat.add_lt_le_mono.
-    - apply (Nat.add_lt_le_mono O (l + 1) (n + (m + k + 1))(n + (m + k + 1))).
-      - rewrite addnC. apply (Nat.add_lt_le_mono O 1 O (l)); lia.
-      - by lia.
-        rewrite addnA.
-        replace (l + 1 + n) with (n + l + 1).
-        - by []. 
-          rewrite <- addnA. by rewrite addnC.
-  Qed.
-
-  Lemma arithmetics2 (n m k l : nat): (n + m + 1 + l <
-  n + m + 1 + (l + k + 1))%coq_nat.
-  Proof.
-    simpl.
-    apply plus_lt_compat_l. rewrite <- addnA.
-    replace (k + 1) with (1 + k).
-    rewrite addnA.
-    apply lt_plus_trans. rewrite addn1. apply Nat.lt_succ_diag_r.
-    by rewrite addnC.
-  Qed.
   
 
   Program Fixpoint merge (a b : Heap) {measure (size a + size b)} : Heap :=
@@ -191,11 +160,14 @@ right sibling.*)
       else
         makeT y a2 (merge h1 b2)
     end.
+    Solve All Obligations with (move=> /=; rewrite -!plusE; lia).
   Next Obligation.
-    apply arithmetics1.
+    move=> /=;
+    rewrite -!plusE; lia.
   Qed.
   Next Obligation.
-    apply arithmetics2.
+    move=> /=;
+    rewrite -!plusE; lia.
   Qed.
   
   Definition insert (x : Elem) (h : Heap) := 
@@ -224,16 +196,20 @@ right sibling.*)
         else T (w1 + w2) y (merge' h1 b2) a2
     end.
     Next Obligation.
-      by apply arithmetics1.
+    move=> /=;
+    rewrite -!plusE; lia.
     Qed.
     Next Obligation.
-      by apply arithmetics1.
+    move=> /=;
+    rewrite -!plusE; lia.
     Qed.
     Next Obligation.
-      by apply arithmetics2.
+    move=> /=;
+    rewrite -!plusE; lia.
     Qed.
     Next Obligation.
-      by apply arithmetics2.
+    move=> /=;
+    rewrite -!plusE; lia.
     Qed.
   End WBLeftistDef.
 
@@ -290,20 +266,9 @@ Module BINOMHEAP.
   Fixpoint size (ts : Heap) : nat :=
     if ts is t :: ts' then (rk t) + size ts' else O.
 
-   (*Lemma arismeticts1 (n m l k : nat) (H : n > 0) : 
-     (k + (m + l) < n + k + (m + l))%coq_nat.
-   Proof.
-     Search Peano.lt.
-     rewrite <- addnA.
-     apply Nat.lt_add_pos_l.
-   Qed.*)
    Lemma pos_rk (t : Tree) : (0 < (rk t))%coq_nat.
    Proof.
-     induction t.
-     case l; simpl.
-     - by [].
-       move=> t l'.
-       lia.
+     by elim: t=> n s [//| t l' /=]; lia.
    Qed.
 
 
@@ -320,31 +285,24 @@ Module BINOMHEAP.
         else insTree (link t1 t2) (merge ts'1 ts'2)
     end.
     Next Obligation. 
-      simpl.
-      rewrite <- addnA.
+      rewrite -addnA.
       apply: (Nat.lt_add_pos_l _ _ (pos_rk t1)).
     Qed.
     Next Obligation.
-      simpl.
-      replace (rk t1 + size ts'1 + (rk t2 + size ts'2)) with
+      move=> /=;
+      have: (rk t1 + size ts'1 + (rk t2 + size ts'2)) =
                (rk t1 + size ts'1 + size ts'2 + rk t2).
-      - apply: (Nat.lt_add_pos_r _ _ (pos_rk t2)).
-        replace (rk t2 + size ts'2) with (size ts'2 + rk t2).
-        - rewrite addnA; by [].
-          by rewrite addnC.
+      - by rewrite -!plusE; lia.
+      move=> ->.
+      apply: (Nat.lt_add_pos_r _ _ (pos_rk t2)).
     Qed.
     Next Obligation.
-      simpl.
-      replace (rk t1 + size ts'1 + (rk t2 + size ts'2)) with
-               ((size ts'1 + size ts'2) + (rk t1 + rk t2)).
-      - apply Nat.lt_add_pos_r. 
-        apply Nat.add_pos_pos; apply pos_rk.
-        replace (rk t1 + size ts'1) with (size ts'1 + rk t1).
-        rewrite <- addnA. rewrite <- addnA.
-        apply Nat.add_cancel_l.
-        rewrite addnC. rewrite <- addnA.
-        by apply Nat.add_cancel_l.
-        by rewrite addnC.
+      move=> /=;
+      have: (rk t1 + size ts'1 + (rk t2 + size ts'2)) =
+               ((size ts'1 + size ts'2) + (rk t1 + rk t2)) by rewrite -!plusE; lia.
+      move=> ->.
+      apply: Nat.lt_add_pos_r. 
+      by apply: Nat.add_pos_pos; apply: pos_rk.
     Qed.
 
     Fixpoint removeMinTree (ts : Heap) : option (Tree * Heap) :=
@@ -435,21 +393,10 @@ Module BINOMHEAP_RK.
   Fixpoint size (ts : Heap) : nat :=
     if ts is t :: ts' then (rk (snd t)) + size ts' else O.
 
-   (*Lemma arismeticts1 (n m l k : nat) (H : n > 0) : 
-     (k + (m + l) < n + k + (m + l))%coq_nat.
-   Proof.
-     Search Peano.lt.
-     rewrite <- addnA.
-     apply Nat.lt_add_pos_l.
-   Qed.*)
-   Lemma pos_rk (t : Tree) : (0 < (rk t))%coq_nat.
-   Proof.
-     induction t.
-     case l; simpl.
-     - by [].
-       move=> t l'.
-       lia.
-   Qed.
+  Lemma pos_rk (t : Tree) : (0 < (rk t))%coq_nat.
+  Proof.
+    by elim: t=> s [//| t l' /=]; lia.
+  Qed.
 
 
   Program Fixpoint merge (ts1 ts2 : Heap) {measure (size ts1 + size ts2)} : Heap :=
@@ -465,31 +412,26 @@ Module BINOMHEAP_RK.
         else insTree (link (snd t1) (snd t2)) (merge ts'1 ts'2)
     end.
     Next Obligation. 
-      simpl.
+      move=> /=;
       rewrite <- addnA.
-      apply: (Nat.lt_add_pos_l _ _ (pos_rk t0)).
+      by apply: (Nat.lt_add_pos_l _ _ (pos_rk t0)).
     Qed.
     Next Obligation.
-      simpl.
-      replace (rk t0 + size ts'1 + (rk t + size ts'2)) with
-               (rk t0 + size ts'1 + size ts'2 + rk t).
+      move=> /=;
+      have: (rk t0 + size ts'1 + (rk t + size ts'2)) =
+               (rk t0 + size ts'1 + size ts'2 + rk t) 
+               by rewrite -!plusE; lia.
+      move=> ->.
       - apply: (Nat.lt_add_pos_r _ _ (pos_rk t)).
-        replace (rk t + size ts'2) with (size ts'2 + rk t).
-        - rewrite addnA; by [].
-          by rewrite addnC.
     Qed.
     Next Obligation.
-      simpl.
-      replace (rk t0 + size ts'1 + (rk t + size ts'2)) with
-               ((size ts'1 + size ts'2) + (rk t0 + rk t)).
+      move=> /=;
+      have: (rk t0 + size ts'1 + (rk t + size ts'2)) =
+               ((size ts'1 + size ts'2) + (rk t0 + rk t))
+               by rewrite -!plusE; lia.
+      move=> ->.
       - apply Nat.lt_add_pos_r. 
         apply Nat.add_pos_pos; apply pos_rk.
-        replace (rk t0 + size ts'1) with (size ts'1 + rk t0).
-        rewrite <- addnA. rewrite <- addnA.
-        apply Nat.add_cancel_l.
-        rewrite addnC. rewrite <- addnA.
-        by apply Nat.add_cancel_l.
-        by rewrite addnC.
     Qed.
 
     Fixpoint removeMinTree (ts : Heap) : option (Tree * Heap) :=
@@ -625,28 +567,15 @@ Fixpoint StackT_to_StackHeap (st : list Elem) : list Heap :=
     | st'   => merge_list (merge_list_one_time st')
     end.
     Next Obligation.
-      move: H0 H. 
-      apply (@list_ind2
-              Heap
-              (fun st : list Heap => 
-              (forall h : Heap, [h] <> st) ->
-              [] <> st ->
-              (length (merge_list_one_time st) < length st)%coq_nat)).
-      - move=> _ fal; by [].
-      - move=> x H. move: (H x); by [].
-        move=> a b l H H1 H0.
-        move: H. case l.
-        - move=> h. by [].
-          move=> h l0.
-          case l0.
-          - move=> HH. by [].
-            move=> h0 l1 HH.
-            simpl in *.
-            assert ((length (merge_list_one_time l1)).+1 < (length l1).+2)%coq_nat.
-            apply HH; by []. by lia.
+      clear merge_list.
+      elim/list_ind2: st H0 H=> [//|x H _|a b [_ _ _ //|h [_ _ _ //|/= h0 l HH _ _]]].
+      - by move: (H x).
+      have: ((length (merge_list_one_time l)).+1 < (length l).+2)%coq_nat by apply HH.
+      by lia.
     Defined.
     Next Obligation.
       by [].
     Qed.
+
   Definition fromList (l : list Elem) : Heap := merge_list (StackT_to_StackHeap l).
 End fromList.
