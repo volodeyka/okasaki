@@ -1,4 +1,7 @@
--R . okasaki
+-Q . okasaki
+
+-arg -w -arg +default
+-arg -w -arg -notation-overridden
 
 ssrlia.v
 LeftistHeap.v
