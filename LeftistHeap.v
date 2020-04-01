@@ -1,13 +1,13 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat seq path order eqtype.
-Require Import ssrlia.
-Require Import Psatz. Require Import Arith.
+From okasaki Require Import ssrlia.
+Require Import Psatz.
 Import Order.TTheory.
 Notation ordType := (orderType tt).
 Require Import Coq.Program.Wf.
 
 Open Scope order_scope.
 
-Module LIFTISTHEAP.
+Module LeftistHeap.
 (*Leftist heaps are heap-ordered binary trees that satisfy the
 leftist property: the rank of any left child is at least as large as the rank of its
 right sibling. The rank of a node is defined to be the length of its right spine
@@ -17,26 +17,7 @@ the shortest path to an empty node.*)
   Section LeftistDef.
     Variables (Elem : ordType).
 
-    Lemma boolean_lem : forall a b, a && b -> b.
-    Proof.
-      by case=> [].
-    Qed.
-    
-    Lemma boolean_lem1 : forall a, a = false -> ~~ a.
-    Proof.
-      by case.
-    Qed.
-
-    Hint Resolve lexx : core.    
-
-    Lemma leF_le : forall (x y : Elem), ((x <= y) = false) -> (y <= x).
-    Proof.
-      move=> x y H.
-      suffices: y < x. rewrite lt_neqAle. apply boolean_lem.
-      suffices: ~~(x <= y).
-      rewrite leNgt. by case: (y < x).
-      by apply boolean_lem1.
-    Qed.
+    Hint Resolve lexx : core.
 
     Inductive Heap :=
     | E : Heap
@@ -363,7 +344,8 @@ the shortest path to an empty node.*)
       1 : apply: IHhr=> //.
       2 : apply: IH'hr=> //.
       all : apply: merge_preserve_LE=> //; constructor=> //.
-      by apply: (leF_le _ _ H).
+      move: (negbT H).
+      by rewrite -ltNge lt_def=> /andP[_ ->].
     Qed.
 
     Lemma Leftist_Inv_l : forall n x tl tr,
@@ -538,10 +520,6 @@ the shortest path to an empty node.*)
       case=> [|n z h1 h2 /=]; first by right.
       by left; exists z.
     Qed.
-    Lemma boolean_lemm : forall (a b : bool), a -> b -> a && b.
-    Proof.
-      case=> [] //.
-    Qed.
     
     Theorem findMin_LE_correct : forall x h,
       HeapOrder h ->
@@ -552,9 +530,9 @@ the shortest path to an empty node.*)
       - move=> n y h1 h2 H /case_member [-> //|[HH|HH] /case_LE XY];
         suffices: x = y=> [-> //|]; move: H.
       - move=> /case_HeapOrder_l [] /LE_correct L /(L _ _ HH) YX.
-      apply: le_anti. by apply: boolean_lemm=> //.
+      apply: le_anti. by apply/andP.
       - move=> /case_HeapOrder_r [] /LE_correct L /(L _ _ HH) YX.
-      apply: le_anti. by apply: boolean_lemm=> //.
+      apply: le_anti. by apply/andP.
       move=> n s h1 h2 HO [] ->; split=> [//|]. apply LE_x_T. by apply lexx.
     Qed.
     Definition deleteMin (h : Heap) :=
@@ -697,8 +675,8 @@ the shortest path to an empty node.*)
     Qed.
     
   End LeftistDef.
-End LIFTISTHEAP.
-Module WBLIFTISTHEAP.
+End LeftistHeap.
+Module WBLeftistHeap.
 (*Weight-biased leftist heaps are an al-
 ternative to leftist heaps that replace the leftist property with the weight-biased
 leftist property: the size of any left child is at least as large as the size of its
@@ -709,7 +687,7 @@ right sibling.*)
   Inductive Heap :=
   | E : Heap
   | T : nat -> Elem -> Heap -> Heap -> Heap.
-
+Print negbT.
   Fixpoint rank (H : Heap) : nat :=
   if H is T r _ _ _ then r else O.
 
@@ -790,4 +768,4 @@ right sibling.*)
     Qed.
 
   End WBLeftistDef.
-End WBLIFTISTHEAP.
+End WBLeftistHeap.

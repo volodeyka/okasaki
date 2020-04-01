@@ -1,10 +1,5 @@
-Require Import ZArith.
-Require Import Psatz.
-
-From mathcomp
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq path div choice.
-From mathcomp
-Require Import fintype tuple finfun bigop prime finset binomial.
+From Coq Require Import Lia.
+From mathcomp Require Import ssreflect ssrbool eqtype ssrnat.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
