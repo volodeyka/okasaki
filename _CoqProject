@@ -1,4 +1,6 @@
--R . okasaki
-Tree.v
-Stack.v
-Heap.v
+-Q . okasaki
+
+-arg -w -arg +default
+-arg -w -arg -notation-overridden
+
+BinSearchTree.v
