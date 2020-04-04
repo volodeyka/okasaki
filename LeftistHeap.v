@@ -3,7 +3,6 @@ From okasaki Require Import ssrlia.
 Require Import Psatz.
 Import Order.TTheory.
 Notation ordType := (orderType tt).
-Require Import Coq.Program.Wf.
 
 Open Scope order_scope.
 
@@ -14,6 +13,27 @@ right sibling. The rank of a node is defined to be the length of its right spine
 (i.e., the rightmost path from the node in question to an empty node). A simple
 consequence of the leftist property is that the right spine of any node is always
 the shortest path to an empty node.*)
+
+  Lemma fst_true a b : true || a || b.
+  Proof.
+    by apply/orP; left.
+  Qed.
+  Hint Resolve fst_true : core.
+
+  Lemma snd_true a b : a || true || b.
+  Proof.
+    by apply/orP; left; apply/orP; right.
+  Qed.
+  Hint Resolve snd_true : core.
+
+  Lemma trd_true a b : b || a || true.
+  Proof.
+    by apply/orP; right.
+  Qed.
+  Hint Resolve trd_true : core.
+
+  
+  
   Section LeftistDef.
     Variables (Elem : ordType).
 
@@ -23,92 +43,85 @@ the shortest path to an empty node.*)
     | E : Heap
     | T : nat -> Elem -> Heap -> Heap -> Heap.
 
-    Inductive LE : Elem -> Heap -> Prop :=
-    | LE_x_E : forall x, LE x E
-    | LE_x_T : forall (x y : Elem) a b n, ((x <= y) = true) -> LE x (T n y a b).
+    Definition LE x h : bool := 
+      if h is T n y a b then (x <= y) else true.
 
-    Hint Resolve LE_x_E : core.
+    Fixpoint HeapOrder h : bool :=
+      if h is T n x tl tr then
+        (LE x tl) && (LE x tr) && (HeapOrder tl) && (HeapOrder tr)
+      else true.
 
-    Inductive HeapOrder : Heap -> Prop :=
-    | HO_E : HeapOrder E
-    | HO_T : forall x tl tr n (L1 : LE x tl) (L2 : LE x tr) 
-              (HO1: HeapOrder tl) (HO2 : HeapOrder tr),
-              HeapOrder (T n x tl tr).
-    
-    Hint Resolve HO_E : core.
 
     Fixpoint rk (h : Heap) : nat :=
       if h is T _ _ _ b then (rk b).+1 else O.
 
-    Inductive Rank_Rk : Heap -> Prop :=
-    | RR_E : Rank_Rk E
-    | RR_T : forall x tl tr (RR_Tl : Rank_Rk tl) (RR_Tr : Rank_Rk tr),
-             Rank_Rk (T (rk tr).+1 x tl tr).
-    
-    Hint Resolve RR_E : core.
+    Fixpoint Rank_Rk h : bool :=
+      match h with
+      | T n x tl tr => (n == (rk tr).+1) && (Rank_Rk tr) && (Rank_Rk tl)
+      | E           => true
+      end.
+        
     
     Fixpoint rank (H : Heap) : nat :=
     if H is T r _ _ _ then r else O.
 
-    Inductive Leftist_Inv : Heap -> Prop :=
-    | LI_E : Leftist_Inv E
-    | LI_T : forall x tl tr n (LI_Tl : Leftist_Inv tl) (LI_Tr : Leftist_Inv tr)
-             (RK : (rank tr <= rank tl)%N), Leftist_Inv (T n x tl tr).
-    
-    Hint Resolve LI_E : core.
+    Fixpoint Leftist_Inv h : bool :=
+    if h is T n x tl tr then
+      (Leftist_Inv tl) && (Leftist_Inv tr) && (rank tr <= rank tl)%N
+    else true.
 
     Lemma rank_correct : forall H, Rank_Rk H -> rk H = rank H.
-    Proof. move=> H [] //. Qed.
+    Proof. by move=> [] //= n _ tl tr /andP[/andP[/eqP]]. Qed.
 
     Inductive side := r | l.
   
     Definition spine := seq side.
 
-    Inductive spine_in : spine -> Heap -> Prop :=
-    | SI_E : spine_in nil E
-    | SI_Tr : forall n x tr tl p
-                       (Spine : spine_in p tr),
-                       spine_in (r :: p) (T n x tl tr)
-    | ST_Tl : forall n x tr tl p
-                       (Spine : spine_in p tl),
-                       spine_in (l :: p) (T n x tl tr).
-    
-    Hint Resolve SI_E : core.
+    Fixpoint spine_in p h : bool :=
+      match p, h with
+      | r :: p, T _ _ _ tr => spine_in p tr
+      | l :: p, T _ _ tl _ => spine_in p tl
+      | [::],   E          => true
+      | _,      _          => false
+      end.
 
-    Inductive Right : spine -> Prop :=
-    | R_nil : Right nil
-    | R_cons : forall s, Right s -> Right (r :: s).
-    
-    Hint Resolve R_nil : core.
+    Fixpoint Right p : bool :=
+      match p with
+      | r :: p' => Right p'
+      | l :: _  => false
+      | [::]    => true
+      end.
     
     Lemma Rigth_correct : forall x s, Right (x :: s) -> (x = r /\ Right s).
-    Proof. by move=> x s H; inversion H. Qed.
+    Proof. move=> [] //=. Qed.
 
-    Lemma spine_in_rl : forall side s n x tl tr, 
+    Lemma case_spine_in : forall side s n x tl tr, 
       spine_in (side :: s) (T n x tl tr) -> 
       if side is r then spine_in s tr else spine_in s tl.
-    Proof. by move=> [] s n x tl tr H; inversion H. Qed. 
+    Proof. move=> [] //=. Qed. 
 
     Definition Leftist_Rank_Inv (H : Heap) := Leftist_Inv H /\ Rank_Rk H.
 
 
-    Lemma Leftist_inv_r: forall n x tl tr,
+    Lemma case_Leftist_Rank_Inv_r: forall n x tl tr,
       Leftist_Rank_Inv (T n x tl tr) -> Leftist_Rank_Inv tr.
-    Proof. by move=> n x tl tr [] H H'; inversion H; inversion H'. Qed.
+    Proof.
+      by move=> n x tl tr [] /= /andP[/andP[_ Ltr _ /andP[/andP[]]]].
+    Qed.
     
-    Lemma Leftist_inv_rl: forall n x tl tr,
+    Lemma case_Leftist_Rank_Inv_rl: forall n x tl tr,
       Leftist_Rank_Inv (T n x tl tr) -> 
       Leftist_Rank_Inv tr /\ Leftist_Rank_Inv tl /\ (rank tr <= rank tl)%N.
-    Proof. by move=> n x tl tr [] H H'; inversion H; inversion H'. Qed.
+    Proof. by move=> n x tl tr [/= /andP[/andP[LIl LIr R /andP[/andP[]]]]]. Qed.
 
     Lemma case_Rank_Rk n y h1 h2 : 
-    Rank_Rk (T n y h1 h2) -> (n = (rk h2).+1) /\ (Rank_Rk h1) /\ (Rank_Rk h2).
-  Proof. by move=> H; inversion H. Qed.
+      Rank_Rk (T n y h1 h2) -> (n = (rk h2).+1) /\ (Rank_Rk h1) /\ (Rank_Rk h2).
+      Proof. by move=> /= /andP[/andP[/eqP]]. Qed.
   
   Lemma case_HeapOrder n y h1 h2 : 
     HeapOrder (T n y h1 h2) ->
     LE y h1 /\ LE y h2 /\ (HeapOrder h1) /\ (HeapOrder h2).
-  Proof. by move=> H; inversion H. Qed.      
+  Proof. by move=> /= /andP[/andP[/andP[]]]. Qed.      
     
   
   Lemma lt_le n : (0 < n)%N -> (n <= 0)%N = false.
@@ -132,9 +145,7 @@ the shortest path to an empty node.*)
   
   Lemma case_Leftist_inv n y h1 h2 : 
     Leftist_Inv (T n y h1 h2) -> ((rank h2 <= rank h1)%N /\ Leftist_Inv h1 /\ Leftist_Inv h2).
-  Proof.
-    by move=> H; inversion H.
-  Qed.
+  Proof. by move=> /= /andP[/andP[]]. Qed.
 
   Lemma leq_1 : forall (a b : nat), (a <= b)%N -> (a.+1 <= b.+1)%N.
     Proof. by move=> a b H; ssrnatlia. Qed.
@@ -143,7 +154,7 @@ the shortest path to an empty node.*)
     Proof.
       elim=> [|n s hl _ hr [] s' [] IHHR IHHS].
       - by exists nil.
-      by exists (r :: s'); split; constructor.
+      by exists (r :: s').
     Qed.
 
     Lemma length_right_spine : forall H s, 
@@ -152,33 +163,30 @@ the shortest path to an empty node.*)
     Proof.
       move=> h s [] _ RC; move: (RC)=> /rank_correct <-.
       elim: h s RC=> 
-      [s _ _ H|n x tl IHhl tr IHtr [_ _ H|
-      [s H /Rigth_correct [] _ RS /spine_in_rl SIr|s _ F]]] /=;
-      try by inversion H.
-      - inversion H; rewrite PeanoNat.Nat.succ_inj_wd.
-        by apply: (IHtr s RR_Tr RS SIr).
-      by inversion F.
+      [[|[]]|n x tl IHhl tr IHtr [_ _|[s /= /andP[/andP[_ RRl RRr]] |]]] //= R S.
+      apply/eqnP=> /=. apply/eqP. by apply: IHtr.
     Qed.
     
+    Lemma spine_in_E s : spine_in s E -> s = [::].
+    Proof. by case: s=> [|[]] //=. Qed.
+    
+
+
     Theorem rigth_spine_shortest : 
       forall H s1 s2, Right s1 -> Leftist_Rank_Inv H -> spine_in s1 H -> spine_in s2 H ->
       (length s1 <= length s2)%nat.
     Proof. 
-      elim=> 
-      [s1 s2 _ H1 H2 _|
+      elim=>
+      [s1 s2 _ _ /spine_in_E->|
       n x tl IHtl tr IHtr [//|
-      a s1 [/Rigth_correct [] -> _ _ _ H|
-      a' s2 /Rigth_correct [] ->]]] /=.
-      - inversion H1; inversion H2=> //.
-      - inversion H.
-      move: a'=> [Rs1 /Leftist_inv_r LI|
-                  Rs1 /Leftist_inv_rl [] LI1 [] LI2 LE]
-                  /spine_in_rl SI1 /spine_in_rl SI2.
+      a s1 [/Rigth_correct [] -> _ _ _ |[]
+      s2 /Rigth_correct [] ->]]] //= => [Rs1 /case_Leftist_Rank_Inv_r LI|
+      Rs1 /case_Leftist_Rank_Inv_rl [] LI1 [] LI2 LE]=> SI1 SI2.
       - apply: leq_1; apply IHtr=> //.
-      rewrite (length_right_spine _ _ LI1 Rs1 SI1).
+      rewrite (length_right_spine tr s1) //.
       case: (Right_spine_ex tl)=> s [] Rs SIstl.
       suffices: (rank tl <= length s2)%N. ssrnatlia.
-      rewrite -(length_right_spine _ _ LI2 Rs SIstl).
+      rewrite -(length_right_spine tl s) //.
       by apply: IHtl.
     Qed.
 
@@ -187,7 +195,6 @@ the shortest path to an empty node.*)
 
     Lemma nlt_gt : forall a b, (a <= b)%N = false -> (b < a)%N.
     Proof.
-      Print leq.
       move=> a b /neq0_lt0n. ssrnatlia.
     Qed.    
 
@@ -195,9 +202,8 @@ the shortest path to an empty node.*)
       Leftist_Inv tl -> Leftist_Inv tr ->
       Leftist_Inv (makeT x tl tr).
     Proof.
-        move=> x tl tr LIl LIr; rewrite /makeT.
-        case H : (rank tr <= rank tl)%N; constructor=> //.
-        move: H=> /nlt_gt. by ssrnatlia.
+        rewrite /makeT=> x tl tr; case H : (rank tr <= rank tl)%N=> /=->->//=.
+        move: H=> /nlt_gt; by ssrnatlia.
     Qed.
 
     Lemma makeT_preserves_rk_inv x tl tr :
@@ -205,7 +211,7 @@ the shortest path to an empty node.*)
       Rank_Rk (makeT x tl tr).
     Proof.
       move=> Rl Rr; rewrite /makeT -!(rank_correct _ Rl) -!(rank_correct _ Rr).
-      by case H : (rk tr <= rk tl)%N; constructor=> //.  
+      by case H : (rk tr <= rk tl)%N=> /=; rewrite Rl Rr eq_refl.
     Qed.
     
     Lemma makeT_peserves_HO_inv x tl tr :
@@ -213,37 +219,13 @@ the shortest path to an empty node.*)
       LE x tl -> LE x tr ->
       HeapOrder (makeT x tl tr).
     Proof.
-      move=> Hl Hr LEl LEr; rewrite /makeT.
-      by case H : (rank tr <= rank tl)%N; constructor=> //.
+      by rewrite /makeT; case H : (rank tr <= rank tl)%N=> /=->->->->.
     Qed.
     
+    Fixpoint member x (h : Heap) :=
+      if h is T _ y a b then (x == y) || (member x a) || (member x b) else false.
 
-    Reserved Notation "x ? h" (at level 0).
-
-    Inductive member : Elem -> Heap -> Prop :=
-    | M_x_Tx : forall x n tl tr, x ? (T n x tl tr)
-    | M_x_Tl : forall x y n tl tr, x ? tl -> x ? (T n y tl tr)
-    | M_x_Tr : forall x y n tl tr, x ? tr -> x ? (T n y tl tr)
-    where "x ? h" := (member x h).
-
-    Hint Resolve M_x_Tx : core.
-
-    (*Program Fixpoint merge (a b : Heap) {measure (rk a + rk b)} : Heap :=
-      match a, b with
-      | h, E => h
-      | E, h => h
-      | T n x a1 b1, T m y a2 b2 =>
-      let h1 := T n x a1 b1 in
-      let h2 := T m y a2 b2 in
-        if x <= y then
-          makeT x a1 (merge b1 h2)
-        else
-          makeT y a2 (merge h1 b2)
-      end.
-    Next Obligation.
-      rewrite addnC (addnC (rk b1).+1 (rk b2).+1).
-      by apply: Nat.add_lt_le_mono; lia.
-    Qed.*)
+    Notation "x ? h" := (member x h) (at level 0).
 
     Definition LeftistHeap (h : Heap) :=
       Leftist_Inv h /\ Rank_Rk h /\ HeapOrder h.
@@ -262,24 +244,21 @@ the shortest path to an empty node.*)
 
     Arguments merge !tl !tr : rename.
 
-    Ltac inv := match goal with
-    | |- _ -> _ => by move=> H; inversion H
-    end.
     Lemma merge_E_h: forall h, merge E h = h.
-    Proof. by case=> //=. Qed.
+    Proof.  by case. Qed.
     Hint Rewrite merge_E_h.
 
     Lemma merge_h_E: forall h, merge h E = h.
-    Proof. by case=> //=. Qed.
+    Proof. by case. Qed.
     Hint Rewrite merge_h_E.
 
     Lemma Rank_Rk_r n x tl tr:
       Rank_Rk (T n x tl tr) -> Rank_Rk tr.
-    Proof. inv. Qed.
+    Proof. by move=> /andP[/andP[]]. Qed.
 
     Lemma Rank_Rk_l n x tl tr :
       Rank_Rk (T n x tl tr) -> Rank_Rk tl.
-    Proof. inv. Qed.
+    Proof. by move=> /andP[/andP[]]. Qed.
 
     Lemma merge_a nl nr x y tll tlr trr trl :
       (x <= y) = false -> 
@@ -287,7 +266,7 @@ the shortest path to an empty node.*)
       makeT y trl (merge  (T nl x tll tlr) trr).
     Proof.
       move=> /= ->.
-      by elim: trr=> //=.
+      by elim: trr.
     Qed.
     
     Hint Rewrite merge_a.
@@ -297,7 +276,7 @@ the shortest path to an empty node.*)
       elim=> [//| nl x tll IHhl tlr IHhr].
       elim=> [|nr y trl IH'hl trr IH'hr] //.
       case H : (x <= y)=> H1 H2; merge_cases;
-      move: (H1) (H2) => /= /case_Rank_Rk [_ [HH1 HH2]] /case_Rank_Rk [_ [HH3 HH4]];
+      move: (H1) (H2) => /case_Rank_Rk [_ [HH1 HH2]] /case_Rank_Rk [_ [HH3 HH4]];
       apply makeT_preserves_rk_inv=> //.
       - by apply IHhr.
       by apply IH'hr.
@@ -305,15 +284,15 @@ the shortest path to an empty node.*)
     
     Lemma case_HeapOrder_l n x tl tr :
       HeapOrder (T n x tl tr) -> (HeapOrder tl /\ LE x tl).
-    Proof. inv. Qed.
+    Proof. by move=> /andP[/andP[/andP[]]]. Qed.
     
     Lemma case_HeapOrder_r n x tl tr :
       HeapOrder (T n x tl tr) -> (HeapOrder tr /\ LE x tr).
-    Proof. inv. Qed.
+    Proof. by move=> /andP[/andP[/andP[]]]. Qed.
 
     Lemma case_LE x y n tr tl :
       LE x (T n y tl tr) -> x <= y.
-    Proof. inv. Qed.
+    Proof. by []. Qed.
     
     Ltac makeT_cases := match goal with
     | H : (?a <= ?b)%N = _ |- _ => rewrite /makeT; move : H => /= ->
@@ -326,10 +305,9 @@ the shortest path to an empty node.*)
     Proof.
       elim=> [//| nl x tll IHhl tlr IHhr].
       elim=> [|nr y trl IH'hl trr IH'hr x' /case_LE HH1 /case_LE HH2] //.
-      merge_casesxy x y; 
+      by merge_casesxy x y; 
       [makeT_casesxy (rank (merge tlr (T nr y trl trr))) (rank tll)|
-       makeT_casesxy (rank (merge (T nl x tll tlr) trr)) (rank trl)];
-      try by constructor.
+       makeT_casesxy (rank (merge (T nl x tll tlr) trr)) (rank trl)].
     Qed.
 
     Lemma merge_preserve_HO_inv : forall h1 h2,
@@ -343,18 +321,18 @@ the shortest path to an empty node.*)
       merge_casesxy x y; apply makeT_peserves_HO_inv=> //.
       1 : apply: IHhr=> //.
       2 : apply: IH'hr=> //.
-      all : apply: merge_preserve_LE=> //; constructor=> //.
+      all : apply: merge_preserve_LE=> //=.
       move: (negbT H).
       by rewrite -ltNge lt_def=> /andP[_ ->].
     Qed.
 
-    Lemma Leftist_Inv_l : forall n x tl tr,
+    Lemma case_Leftist_Inv_l n x tl tr :
     Leftist_Inv (T n x tl tr) -> Leftist_Inv tl.
-    Proof. by move=> n x tl tr H; inversion H. Qed.
+    Proof. by move=> /andP[/andP[]].  Qed.
 
-    Lemma Leftist_Inv_r : forall n x tl tr,
+    Lemma case_Leftist_Inv_r n x tl tr :
     Leftist_Inv (T n x tl tr) -> Leftist_Inv tr.
-    Proof. by move=> n x tl tr H; inversion H. Qed.
+    Proof. by move=> /andP[/andP[]].  Qed.
     
     Lemma merge_preserve_LI_inv : forall h1 h2,
       Leftist_Inv h1 -> Leftist_Inv h2 -> Leftist_Inv (merge h1 h2).
@@ -380,62 +358,55 @@ the shortest path to an empty node.*)
     Lemma case_member : forall x y n tl tr,
     x ? (T n y tl tr) <-> (x = y) \/ (x ? tl) \/ (x ? tr).
     Proof.
-      split; first by move=> H; inversion H; [left|right; left|right; right].
-      by case=> [->|[/M_x_Tl|/M_x_Tr]].
+      split.
+      - move=> /orP[/orP[/eqP|]|]; by [left|right; left|right; right].
+      case=> [->|[]H] /=; apply/orP.
+      - by left; apply/orP; left.
+      - by left; apply/orP; right.
+      by right.
     Qed.
-    Hint Resolve M_x_Tx : core.
-    Lemma makeT_correct h1 h2 x y :
+
+    Lemma makeT_spec h1 h2 x y :
       x ? (makeT y h1 h2) <-> (x = y) \/ (x ? h1) \/ (x ? h2).
     Proof.
     makeT_casesxy (rank h2) (rank h1).
-    (*M_x_Tl : forall x y n tl tr, x ? tl -> x ? (T n y tl tr)*) 
       split => /case_member // [|[]].
-      split=> [/case_member // [|[]]| 
-      [->|[/(M_x_Tr x y (rank h1).+1 h2 h1)|
-           /(M_x_Tl x y (rank h1).+1 h2 h1)]]] //.
+      split=> [/case_member // [->|[]->]|[->/=|[]/=->]] //.
       - by left.
       - by right; right.
       - by right; left.
-    Qed.    
-    Ltac member_left := match goal with
-    | H : ?x ? ?h1 |- ?x ? (T _ _ ?h1 ?h2) => by apply M_x_Tl
-    end.
+      by rewrite eq_refl.
+    Qed.
     
-    Theorem merge_correct : forall h1 h2 x,
+    Theorem merge_spec : forall h1 h2 x,
       x ? (merge h1 h2) <-> (x ? h1) \/ (x ? h2).
     Proof.
       split.
       - elim: h1 h2=> [h2|n y h1 IHh1 h2 IHh2].
       - rewrite merge_E_h=> H; by right.
       - elim=> [|m z h21 IHh21 h22 IHh22]; first by rewrite merge_h_E=> H; left.
-      - merge_casesxy y z=> /makeT_correct [-> |[HH|]].
+      - merge_casesxy y z=> /makeT_spec [-> |[->|]].
+      - by left; rewrite eq_refl.
       - by left.
-      - by left; apply M_x_Tl.
-      - move=> /IHh2 [] xMh2; [left; apply: M_x_Tr|]=> //.
-      1,2: by right.
-      - by right; apply M_x_Tl.
-      - by move=> /IHh22 []; [left|right; apply: M_x_Tr].
+      - move=> /IHh2 [->|]; [left|]=> //=; by right.
+      1,2: by rewrite ?eq_refl; right.
+      - move=> /IHh22 [/case_member [->|[]->]|->]; rewrite ?eq_refl.
+      1-3: by left.
+      - by right.
 
-      - elim: h1 h2=> [h [F|H]|n y h11 IHh1 h22 IHh2]; rewrite ?merge_E_h //;
-        first by inversion F.
-      - elim=> [[] // F|m z h12 IHh12 h21 IHh21]; rewrite ?merge_h_E; 
-        first by inversion F.
-      merge_casesxy y z; case=> /case_member [|[HH|HH]]; rewrite makeT_correct.
+      - elim: h1 h2=> [h [F|H]|n y h11 IHh1 h22 IHh2]; rewrite ?merge_E_h //.
+      - elim=> [[] // F|m z h12 IHh12 h21 IHh21]; rewrite ?merge_h_E.
+      merge_casesxy y z; case=> /orP[/orP[/eqP|]|]; rewrite makeT_spec.
       - by left.
       - by right; left.
       1-4: right; right; apply IHh2.
       - by left.
-      1- 3: right.
-      - by rewrite H0.
-      - by apply M_x_Tl.
-      - by apply M_x_Tr.
-      1-3, 6: right; right; apply IHh21.
-      - by rewrite H0; left.
-      - by left; apply M_x_Tl.
-      - by left; apply M_x_Tr.
+      1- 3: by right=> /=; rewrite H0 ?eq_refl.
+      1-3, 6: right; right; apply IHh21=> /=; rewrite H0 ?eq_refl.
+      1-3: by left.
       - by right.
       - by left.
-      - by right; left.
+      by right; left.
     Qed.
 
     Definition insert (x : Elem) (h : Heap) := 
@@ -447,46 +418,36 @@ the shortest path to an empty node.*)
     Lemma insert_preserve_rk_inv : forall h x,
       Rank_Rk h -> Rank_Rk (insert x h).
     Proof.
-      move=> h x Rh; apply merge_preserve_rk_inv=> //.
-      rewrite -rk_E. by apply RR_T.
+      by move=> h x Rh; apply merge_preserve_rk_inv.
     Qed.
 
     Lemma insert_preserve_HO_inv : forall h x,
       HeapOrder h -> HeapOrder (insert x h).
     Proof.
-      move=> h x Rh; apply merge_preserve_HO_inv=> //.
-      by apply HO_T.
+      by move=> h x Rh; apply merge_preserve_HO_inv.
     Qed.
 
     Lemma insert_preserve_LI_inv : forall h x,
       Leftist_Inv h -> Leftist_Inv (insert x h).
     Proof.
-      move=> h x Rh; apply merge_preserve_LI_inv=> //.
-      by apply LI_T.
+      by move=> h x Rh; apply merge_preserve_LI_inv.
     Qed.
 
     Theorem insert_preserve_LH : forall h x,
       LeftistHeap h -> LeftistHeap (insert x h).
     Proof.
-      move=> h x Rh; apply merge_preserve_LH=> //.
-      split; first by apply LI_T.
-      split; first by rewrite -rk_E; apply RR_T.
-      by apply HO_T.
+      by move=> h x Rh; apply merge_preserve_LH.
     Qed.
     
-    Lemma x_Ty : forall x y, (x) ? (T 1 y E E) <-> (x = y).
+    Lemma x_Ty x y : (x) ? (T 1 y E E) <-> (x = y).
     Proof.
-      move=> x y.
-      split=> [H|->].
-      - inversion H=> //; inversion H2.
-      by apply M_x_Tx.
+      by split=> /= [/orP[/orP[/eqP|]|]|->]; rewrite ?eq_refl.
     Qed.
 
-    Theorem insert_correct : forall h x y,
+    Theorem insert_correct h x y :
     x ? (insert y h) <-> (x = y) \/ (x ? h).
     Proof.
-      move=> h x y.
-      by rewrite merge_correct x_Ty.
+      by rewrite merge_spec x_Ty.
     Qed.
     
     Definition findMin (h : Heap) := 
@@ -494,23 +455,22 @@ the shortest path to an empty node.*)
 
     Theorem findMin_correct1 : forall h,
       None = findMin h <-> h = E.
-    Proof. split=> [|-> //]. move: h. by case. Qed.
+    Proof. split=> [|-> //]. by case : h. Qed.
     
     Lemma LE_correct : forall h x y,
       HeapOrder h -> x ? h -> LE y h -> y <= x.
     Proof.
       elim=> [x y _ H| n x h1 IHh1 h2 IHh2 x' y' HO /case_member 
-      [-> /case_LE //|[H|H] /case_LE] ];
-      first by inversion H.
+      [-> /case_LE //|[H|H] /case_LE]]//.
       move: HO=> /case_HeapOrder_l [] /IHh1 H1 /(H1 x' x H) H2 H3.
       2: move: HO=> /case_HeapOrder_r [] /IHh2 H1 /(H1 x' x H) H2 H3.
-      all: move: H3 H2; apply le_trans.
+      all: move: H3 H2; apply: le_trans.
     Qed.
 
     Theorem findMin_correct2 : forall h, HeapOrder h ->
       forall z, Some z = findMin h -> forall x, x ? h -> z <= x.
     Proof.
-      case=> [//| n x h1 h2 HO z /= [->] y /case_member [-> //|[H|H]]].
+      case=> [//| n x h1 h2 HO z /= [->] y /(case_member _ _ n)[-> //|[H|H]]].
       - by move: HO=> /case_HeapOrder_l [] /LE_correct - /(_ _ x H).
       - by move: HO=> /case_HeapOrder_r [] /LE_correct - /(_ _ x H).
     Qed.
@@ -525,106 +485,87 @@ the shortest path to an empty node.*)
       HeapOrder h ->
       (x ? h /\ LE x h) <-> (Some x = findMin h).
     Proof.
-      split=> [[]|]; move: h H=> [] //=.
-      - move=> H F; inversion F.
+      split=> [[]|]; move: h H=> [] //.
       - move=> n y h1 h2 H /case_member [-> //|[HH|HH] /case_LE XY];
         suffices: x = y=> [-> //|]; move: H.
       - move=> /case_HeapOrder_l [] /LE_correct L /(L _ _ HH) YX.
       apply: le_anti. by apply/andP.
       - move=> /case_HeapOrder_r [] /LE_correct L /(L _ _ HH) YX.
       apply: le_anti. by apply/andP.
-      move=> n s h1 h2 HO [] ->; split=> [//|]. apply LE_x_T. by apply lexx.
+      move=> n s h1 h2 HO [] ->; split=> /=. 
+      - by rewrite eq_refl.
+      by apply lexx.
     Qed.
+
     Definition deleteMin (h : Heap) :=
       if h is T _ _ a b then merge a b else E.
 
-    Lemma Rank_Rk_eq : forall n x h1 h2,
+    Lemma Rank_Rk_eq n x h1 h2 :
       Rank_Rk (T n x h1 h2) -> n = (rk h2).+1.
-    Proof. by move=> n x h1 h2 H; inversion H. Qed.
+    Proof. by move=> /andP[/andP[/eqP]]. Qed.
     
-    Lemma case_LE' : forall x y h1 h2 n,
+    Lemma case_LE' x y h1 h2 n :
       LE x (T n y h1 h2) -> ((x <= y) = true).
-    Proof.
-      by move=> x y h1 h2 n H; inversion H.
-    Qed.
+    Proof. by move=> /= ->. Qed.
 
     Lemma rk1 : forall m y h1 h2,
       (1 <= rk (T m y h1 h2))%N.
-    Proof.
-      move=> m y h1 h2 /=. ssrnatlia.
-    Qed.
+    Proof. move=> m y h1 h2 /=. ssrnatlia. Qed.
 
     Lemma rank1 : forall m y h1 h2,
     Rank_Rk (T m y h1 h2) -> (1 <= rank (T m y h1 h2))%N.
-    Proof.
-      move=> m y h1 h2 /rank_correct <-. by apply rk1.
-    Qed.
+    Proof. move=> m y h1 h2 /rank_correct <-. by apply rk1. Qed.
     
     Lemma rk0: rk E = 0.
-    Proof.
-      by [].
-    Qed.
+    Proof. by []. Qed.
     
     Lemma rank0: rank E = 0.
-    Proof.
-      by [].
-    Qed.
+    Proof. by []. Qed.
 
     Lemma LI_exfalso n x m y h1 h2 :
       LeftistHeap (T n x E (T m y h1 h2)) -> False.
     Proof.
-      move=> [LI [RR HO]].
-      inversion LI. exfalso.
-      suffices: (1 <= 0)%N.
-      - ssrnatlia.
-      move: RK. rewrite -!rank_correct ?rk0.
-      move: (rk1 m y h1 h2). apply leq_trans.
-      - by [].
-      by move: RR=> /Rank_Rk_r.
+      move=> [/= /andP[/andP[/andP[]]]] LI1 LI2 rr M0 [/andP[/andP[]]] _
+        /andP[/andP[/eqP M RR1 RR2 _]] _.
+      by move : M M0=>-> //.
     Qed.
 
     Lemma case_LeftistHeap_l n x h1 h2 :
     LeftistHeap (T n x h1 h2) -> LeftistHeap h1.
     Proof.
-      move=> [/Leftist_Inv_l LI [/Rank_Rk_l RR /case_HeapOrder_l [HO _]]].
+      move=> [/case_Leftist_Inv_l LI [/Rank_Rk_l RR /case_HeapOrder_l [HO _]]].
       split=> [//|]; by split.
     Qed.
     
     Lemma case_LeftistHeap_r n x h1 h2 :
     LeftistHeap (T n x h1 h2) -> LeftistHeap h2.
-    Proof.
-      move=> [/Leftist_Inv_r LI [/Rank_Rk_r RR /case_HeapOrder_r [HO _]]].
+    Proof. 
+      move=> [/case_Leftist_Inv_r LI2 [/Rank_Rk_r RR /case_HeapOrder_r [HO _]]].
       split=> [//|]; by split.
     Qed.
     
     Lemma deleMin_preserve_rk_inv : forall h, 
       Rank_Rk h -> Rank_Rk (deleteMin h).
     Proof.
-      case=> //=n x h1 h2 H. apply merge_preserve_rk_inv; move: H.
-      - by move/Rank_Rk_l.
-      by move/Rank_Rk_r.
+      by case=> //=n x h1 h2 H; apply merge_preserve_rk_inv; move: H=> /andP[/andP[]].
     Qed.
     
     Lemma deleMin_preserve_HO_inv : forall h, 
       HeapOrder h -> HeapOrder (deleteMin h).
     Proof.
-      case=> //=n x h1 h2 H. apply merge_preserve_HO_inv; move: H.
-      - by move=>/case_HeapOrder_l [].
-      by move=>/case_HeapOrder_r [].
+      by case=> //=n x h1 h2 H; apply merge_preserve_HO_inv; move: H=> /andP[/andP[]].
     Qed.
 
     Lemma deleMin_preserve_LI_inv : forall h, 
       Leftist_Inv h -> Leftist_Inv (deleteMin h).
     Proof.
-      case=> //=n x h1 h2 H. apply merge_preserve_LI_inv; move: H.
-      - by move/Leftist_Inv_l.
-      by move/Leftist_Inv_r.
+      by case=> //=n x h1 h2 H; apply merge_preserve_LI_inv; move: H=> /andP[/andP[]].
     Qed.
 
     Lemma deleMin_correct : forall h, 
       LeftistHeap h -> LeftistHeap (deleteMin h).
     Proof.
-      case=> //=n x h1 h2 H. apply merge_preserve_LH; move: H.
+      case=> //=n x h1 h2 H; apply merge_preserve_LH; move: H.
       - by move/case_LeftistHeap_l.
       by move/case_LeftistHeap_r.
     Qed.
@@ -633,31 +574,15 @@ the shortest path to an empty node.*)
       Some x = findMin h -> (y ? (insert x (deleteMin h))) <-> y ? h.
     Proof.
       case=> [//=|n x h1 h2 y z [->]];
-      by rewrite insert_correct /= merge_correct case_member.
+      by rewrite insert_correct /= merge_spec case_member.
     Qed.
     
     Definition isEmpty (h : Heap) :=
       if h is E then true else false.
 
     Theorem emptyP h : reflect (h = E) (isEmpty h).
-    Proof.
-      by case h; constructor.
-    Qed.
+    Proof. by case h; constructor. Qed.
 
-    Fixpoint memb x (h : Heap) :=
-      if h is T _ y a b then
-        if (x == y) then true else (memb x a) || (memb x b) else false.    
-
-    Theorem memberP x h : reflect (x ? h) (memb x h).
-    Proof.
-      elim h=> [|n y h1 IHh1 h2 IHh2 /=]; first by constructor=> F; inversion F.
-      apply (@iffP (x = y \/ (x ? h1) \/ (x ? h2))); rewrite ?case_member //.
-      apply: (iffP orP); case=> [/eqP H|]; try by left; try by right.
-      - by move=> /orP [/IHh1| /IHh2]; [right; left| right; right].
-      by case; right; apply/orP; [left; apply/IHh1|right; apply/IHh2].
-    Qed.
-
-    
     Fixpoint insert' (x : Elem) (h : Heap) :=
       if h is T n y a b then
       let h' := T n y a b in 
@@ -669,9 +594,10 @@ the shortest path to an empty node.*)
     Theorem insertE x h : Rank_Rk h -> Leftist_Inv h -> insert' x h = insert x h.
     Proof.
       rewrite /insert.
-      elim h=> [//=|n y h1 IHh1 h2 IHh2 RR]; move : RR (RR)=> /rank1.
-      case H : (x <= y); merge_cases. rewrite /makeT /= => /lt_le -> //.
-      move=> _; swapg=> /case_Leftist_inv [RR [LI _]] /Rank_Rk_r/IHh2 <- //.
+      elim h=> [//|n y h1 IHh1 h2 IHh2 RR]; move : RR (RR)=> /rank1.
+      case H : (x <= y); merge_cases. rewrite /makeT => /lt_le -> //.
+      move=> _ /andP[/andP[nr RR1 RR2]] /andP[/andP[LI1 LI2 rr]].
+      by rewrite IHh2.
     Qed.
     
   End LeftistDef.
