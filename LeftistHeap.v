@@ -79,7 +79,13 @@ match h with
 | Node n x tl tr => (n == (rk tr).+1) && (rank_rk tl) && (rank_rk tr)
 | Emp           => true
 end.
-  
+
+(** The (general) rank of a tree is the length of the shortest path from the root to leaves *)
+Fixpoint grank h : nat :=
+  if h is Node _ _ l r then
+    (minn (grank l) (grank r)).+1
+  else 0.
+
 
 Fixpoint rank h : nat := if h is Node r _ _ _ then r else O.
 
@@ -120,7 +126,6 @@ Proof. move=> [] //=. Qed.
 
 Definition leftist_rank_inv h := leftist_inv h && rank_rk h.
 
-
 Lemma case_leftist_rank_inv_r n x tl tr :
 leftist_rank_inv (Node n x tl tr) -> leftist_rank_inv tr.
 Proof.
@@ -135,9 +140,27 @@ rewrite /leftist_rank_inv=> /andP[] /=;
 by move=> /andP[/andP[->->->/andP[/andP[_ ->->]]]].
 Qed.
 
+
 Lemma case_rank_rk n y h1 h2 : 
 rank_rk (Node n y h1 h2) -> (n == (rk h2).+1) && (rank_rk h1) && (rank_rk h2).
 Proof. by []. Qed.
+
+Lemma case_leftist_rank_inv n x tl tr: 
+leftist_rank_inv (Node n x tl tr) -> (n == (rank tr).+1) &&
+(leftist_rank_inv tr && leftist_rank_inv tl && (rank tr <= rank tl)%N).
+Proof.
+  move=> LI. move: LI (LI)=> /case_leftist_rank_inv_rl -> /andP[_ H].
+  move: H (H)=> /case_rank_rk /andP[/andP[/eqP-> _ /rank_correct ->]].
+  by rewrite eq_refl.
+Qed.
+
+
+Theorem grank_rk h : leftist_rank_inv h -> grank h = rank h.
+Proof.
+elim: h=> // n x h1 IHh1 h2 IHh2 
+          /case_leftist_rank_inv/andP[/= /eqP -> /andP[/andP[L1 L2]]] /=. 
+rewrite IHh1 // IHh2 //. by rewrite minnC ?Order.NatOrder.minnE=> ->.
+Qed.
 
 Lemma case_heap_ordered n y h1 h2 : 
 heap_ordered (Node n y h1 h2) ->
@@ -571,7 +594,7 @@ Variables (T: ordType).
 Inductive heap :=
 | Emp : heap
 | Node : nat -> T-> heap -> heap -> heap.
-Print negbT.
+ 
 Fixpoint rank (H : heap) : nat :=
 if H is Node r _ _ _ then r else O.
 
