@@ -3,6 +3,7 @@ From okasaki Require Import ssrlia.
 Require Import Psatz.
 Import Order.TTheory.
 Notation ordType := (orderType tt).
+Import Order.NatOrder.
 
 Open Scope order_scope.
 
@@ -24,11 +25,6 @@ by apply/orP; right.
 Qed.
 Hint Resolve trd_true : core.
 
-Lemma lt_le n : (0 < n)%N -> (n <= 0)%N = false.
-Proof.
-case H : (n <= 0)%N=> //.
-by move/leq_trans/(_ H).
-Qed.
 
 Lemma leq_1 : forall (a b : nat), (a <= b)%N -> (a.+1 <= b.+1)%N.
 Proof. by move=> a b H; ssrnatlia. Qed.
@@ -215,6 +211,7 @@ n x tl IHtl tr IHtr [//|
 a s1 [/rigth_correct [] -> _ _ _ |[]
 s2 /rigth_correct [] ->]]] //= => [Rs1 /case_leftist_rank_inv_r LI|
 Rs1 /case_leftist_rank_inv_rl /andP[/andP[LI1 LI2 LE]]] => SI1 SI2.
+Search _ (?a + ?c <= ?b + ?c)%N. rewrite -!addn1.
 - apply: leq_1; apply IHtr=> //.
 rewrite (length_right_spine tr s1) //.
 case: (right_spine_ex tl)=> s /andP [] Rs SIstl.
@@ -576,7 +573,7 @@ Theorem insertE x h : rank_rk h -> leftist_inv h -> insert' x h = insert x h.
 Proof.
 rewrite /insert.
 elim h=> [//|n y h1 IHh1 h2 IHh2 RR]; move : RR (RR)=> /rank1.
-case H : (x <= y); merge_cases. rewrite /makeT => /lt_le -> //.
+case H : (x <= y); merge_cases. rewrite /makeT => /ltn_geF -> //.
 move=> _ /andP[/andP[nr RR1 RR2]] /andP[/andP[LI1 LI2 rr]].
 by rewrite IHh2.
 Qed.
