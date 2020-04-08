@@ -1,4 +1,4 @@
-From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat seq path order eqtype.
+From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat seq path order eqtype. 
 From okasaki Require Import ssrlia.
 Require Import Psatz.
 Import Order.TTheory.
@@ -7,33 +7,18 @@ Import Order.NatOrder.
 
 Open Scope order_scope.
 
-Lemma fst_true a b : true || a || b.
-Proof.
-by apply/orP; left.
-Qed.
-Hint Resolve fst_true : core.
-
 Lemma snd_true a b : a || true || b.
 Proof.
-by apply/orP; left; apply/orP; right.
+by case: a.
 Qed.
-Hint Resolve snd_true : core.
 
 Lemma trd_true a b : b || a || true.
 Proof.
-by apply/orP; right.
+by case: a; case b.
 Qed.
-Hint Resolve trd_true : core.
+Hint Resolve trd_true snd_true lexx : core.
 
-
-Lemma leq_1 : forall (a b : nat), (a <= b)%N -> (a.+1 <= b.+1)%N.
-Proof. by move=> a b H; ssrnatlia. Qed.
-
-
-Lemma nlt_gt : forall a b, (a <= b)%N = false -> (b < a)%N.
-Proof.
-move=> a b /neq0_lt0n. ssrnatlia.
-Qed.    
+Notation xpredU2 := (fun a1 (p1 p2 : pred _) x => (x == a1) || p1 x || p2 x).
 
 Module leftistheap.
 (*Leftist heaps are heap-ordered binary trees that satisfy the
@@ -42,24 +27,74 @@ right sibling. The rank of a node is defined to be the length of its right spine
 (i.e., the rightmost path from the node in question to an empty node). A simple
 consequence of the leftist property is that the right spine of any node is always
 the shortest path to an empty node.*)
-
 Section LeftistDef.
 Variables (T: ordType).
-
-Hint Resolve lexx : core.
 
 Inductive heap :=
 | Emp : heap
 | Node : nat -> T-> heap -> heap -> heap.
 
 
+(*Fixpoint member x h :=
+if h is Node _ y a b then (x == y) || (member x a) || (member x b) else false.
+
+Notation "x \in h" := (member x h) (at level 0).*)
+
+End LeftistDef.
+Arguments Node {T}.
+Arguments Emp {T}.
+Notation "'[' tl '|' n ',' x '|' tr ']'" := (Node n x tl tr) (at level 0).
+
+Section Specifications.
+Variables (T : ordType).
+Implicit Type h : heap T.
+
+Fixpoint eqheap (h1 h2 : heap T) :=
+  match h1, h2 with
+  | Emp, Emp => true
+  | Node n1 x1 tl1 tr1, Node n2 x2 tl2 tr2 => (n1 == n2) && (x1 == x2) && eqheap tl1 tl2 && eqheap tr1 tr2
+  | _, _ => false
+  end.
+
+Lemma eqheapP : Equality.axiom eqheap.
+Proof.
+move; elim=> [|n x tl IHh1 tr IHh2] [|m y h1 h2] /=; try by constructor.
+case EQn : (n == m)=> /=; last by constructor; case=> /eqP; rewrite EQn.
+case EQ : (x == y)=> /=; last by constructor; case=> _ /eqP; rewrite EQ.
+case EQl : (eqheap tl h1)=> /=; last by constructor; case=> _ _ /IHh1; rewrite EQl.
+case EQr : (eqheap tr h2)=> /=; last by constructor; case=> _ _ _ /IHh2; rewrite EQr.
+constructor. by rewrite (eqP EQ) (eqP EQn) (IHh1 _ EQl) (IHh2 _ EQr).
+Qed.
+
+Canonical heap_eqMixin := EqMixin eqheapP.
+Canonical heap_eqType := Eval hnf in EqType (heap T) heap_eqMixin.
+
+Lemma eqheapE : eqheap = eq_op. Proof. by []. Qed.
+
+Lemma eqheap_Node (x1 x2 : T) n1 n2 tr1 tr2 tl1 tl2 :
+  ([tl1 | n1, x1 | tr1] == [tl2 | n2, x2 | tr2]) = (n1 == n2) && (x1 == x2) && (tl1 == tl2) && (tr1 == tr2).
+Proof. by []. Qed.
+
+Fixpoint mem_heap (h : heap T) :=
+  if h is Node _ y tl tr then xpredU2 y (mem_heap tl) (mem_heap tr) else xpred0.
+
+Definition heap_eqclass := heap T.
+Identity Coercion heap_of_eqclass : heap_eqclass >-> heap.
+Coercion pred_of_heap (h : heap_eqclass) : {pred T} := mem_heap h.
+
+Canonical heap_predType := PredType pred_of_heap.
+(* The line below makes mem_seq a canonical instance of topred. *)
+Canonical mem_seq_predType := PredType mem_heap.
+
+Lemma in_Node x y n tl tr: 
+  x \in [tl | n, y | tr] = (x == y) || (x \in tl) || (x \in tr).
+Proof. by []. Qed.
+
 Definition empty h :=
 if h is Emp then true else false.
 
 Theorem emptyP h : reflect (h = Emp) (empty h).
 Proof. case h; by constructor. Qed.
-
-Implicit Type h : heap.
 
 Definition LE x h : bool := 
 if h is Node n y a b then (x <= y) else true.
@@ -82,6 +117,8 @@ Fixpoint grank h : nat :=
     (minn (grank l) (grank r)).+1
   else 0.
 
+Lemma rank_eq0 h : (rk h == 0) = (h == Emp).
+Proof. by case: h. Qed.
 
 Fixpoint rank h : nat := if h is Node r _ _ _ then r else O.
 
@@ -211,8 +248,7 @@ n x tl IHtl tr IHtr [//|
 a s1 [/rigth_correct [] -> _ _ _ |[]
 s2 /rigth_correct [] ->]]] //= => [Rs1 /case_leftist_rank_inv_r LI|
 Rs1 /case_leftist_rank_inv_rl /andP[/andP[LI1 LI2 LE]]] => SI1 SI2.
-Search _ (?a + ?c <= ?b + ?c)%N. rewrite -!addn1.
-- apply: leq_1; apply IHtr=> //.
+- rewrite -addn1 -[(length s2).+1]addn1 leq_add2r. by apply IHtr.
 rewrite (length_right_spine tr s1) //.
 case: (right_spine_ex tl)=> s /andP [] Rs SIstl.
 suffices: (rank tl <= length s2)%N. ssrnatlia.
@@ -220,16 +256,23 @@ rewrite -(length_right_spine tl s) //.
 by apply: IHtl.
 Qed.
 
-Definition makeT (x : T) (a b : heap) : heap :=
-if (rank b <= rank a)%N then Node (rank b).+1 x a b else Node (rank a).+1 x b a.
+Definition makeT (x : T) h1 h2 :=
+if (rank h2 <= rank h1)%N then Node (rank h2).+1 x h1 h2 else Node (rank h1).+1 x h2 h1.
 
-Lemma makeT_preserves_LI_inv : forall x tl tr,
+Ltac makeT_cases := match goal with
+| H : (?a <= ?b)%N = _ |- _ => rewrite /makeT; move : H => /= ->
+end.
+
+Ltac makeT_casesxy x y := case fresh : (x <= y)%N; makeT_cases.
+
+Lemma makeT_preserves_LI_inv x tl tr :
 leftist_inv tl -> leftist_inv tr ->
 leftist_inv (makeT x tl tr).
-Proof.
-  rewrite /makeT=> x tl tr; case H : (rank tr <= rank tl)%N=> /=->->.
-  - by rewrite H.
-  move: H=> /nlt_gt H. apply/andP; split=> //; apply/andP; split=>//. by ssrnatlia.
+Proof. 
+rewrite /makeT; case H : (rank tr <= rank tl)%N=> /=->->.
+- by rewrite H.
+- suffices: (rank tl <= rank tr)%N => [->|] //; move: H.
+move=> /neq0_lt0n; by ssrnatlia.
 Qed.
 
 Lemma makeT_preserves_rk_inv x tl tr :
@@ -247,11 +290,6 @@ heap_ordered (makeT x tl tr).
 Proof.
 by rewrite /makeT; case H : (rank tr <= rank tl)%N=> /=->->->->.
 Qed.
-
-Fixpoint member x h :=
-if h is Node _ y a b then (x == y) || (member x a) || (member x b) else false.
-
-Notation "x ? h" := (member x h) (at level 0).
 
 Definition leftistheap h :=
 leftist_inv h && rank_rk h && heap_ordered h.
@@ -295,7 +333,6 @@ move=> /= ->.
 by elim: trr.
 Qed.
 
-Hint Rewrite merge_a.
 Lemma merge_preserve_rk_inv : forall h1 h2,
 rank_rk h1 -> rank_rk h2 -> rank_rk (merge h1 h2) .
 Proof.
@@ -319,12 +356,6 @@ Proof. by move=> /= /andP[/andP[/andP[_ -> _ ->]]]. Qed.
 Lemma case_LE x y n tr tl :
 LE x (Node n y tl tr) -> x <= y.
 Proof. by []. Qed.
-
-Ltac makeT_cases := match goal with
-| H : (?a <= ?b)%N = _ |- _ => rewrite /makeT; move : H => /= ->
-end.
-
-Ltac makeT_casesxy x y := case fresh : (x <= y)%N; makeT_cases.
 
 Lemma merge_preserve_LE : forall h1 h2 x,
 LE x h1 -> LE x h2 -> LE x (merge h1 h2).
@@ -378,42 +409,37 @@ move=> /andP[/andP[LI1 RR1 HO1]] /andP[/andP[LI2 RR2 HO2]]; apply/andP; split.
 - by apply: merge_preserve_rk_inv.
 by apply: merge_preserve_HO_inv. 
 Qed.
-
-Lemma case_member : forall x y n tl tr,
-x ? (Node n y tl tr) <-> (x == y) || (x ? tl) || (x ? tr).
-Proof. by []. Qed.
-
+Hint Rewrite in_Node : core.
 Lemma makeT_spec h1 h2 x y :
-x ? (makeT y h1 h2) = ((x == y) || (x ? h1) || (x ? h2)).
+x \in (makeT y h1 h2) = ((x == y) || (x \in h1) || (x \in h2)).
 Proof.
 makeT_casesxy (rank h2) (rank h1).
-apply/idP/idP => /case_member // [|[]].
-by apply/idP/idP => /= /orP[/orP[]|]->.
+apply/idP/idP=> //. by rewrite -orbA [(x \in h1) || _]orbC orbA.
 Qed.
 
 Theorem merge_spec  h1 h2 x :
-x ? (merge h1 h2) = ((x ? h1) || (x ? h2)).
+x \in (merge h1 h2) = ((x \in h1) || (x \in h2)).
 Proof.
 apply/idP/idP.
 - elim: h1 h2=> [h2|n y h1 IHh1 h2 IHh2].
 - by rewrite merge_E_h=>->.
 - elim=> [|m z h21 IHh21 h22 IHh22]; first by rewrite merge_h_E=>->.
-- merge_casesxy y z; rewrite makeT_spec=> /orP[->|] //.
-- by move=> /IHh2 /= /orP[] ->.
-- move=> /IHh22 /= /orP[] -> //. apply/orP; by right.
+- merge_casesxy y z; rewrite makeT_spec !in_Node => /orP[->|] //.
+- by move=> /IHh2 /= /orP[]; rewrite ?in_Node=> /= ->.
+- move=> /IHh22 /= /orP[]; rewrite ?in_Node=> -> //. apply/orP; by right.
 
 - elim: h1 h2 => [h |n y h11 IHh1 h22 IHh2]; rewrite ?merge_E_h //.
-- elim=> [/orP [] //|m z h12 IHh12 h21 IHh21]; rewrite ?merge_h_E.
+- elim=> [/orP [] //|m z h12 IHh12 h21 IHh21]; rewrite ?merge_h_E ?in_Node.
 merge_casesxy y z; move=> /orP[/orP[/orP[]|]|/orP[/orP[]|]]; rewrite makeT_spec.
 1,2: by move=>->.
-1-4: move=> HH; apply/orP; right=> /=; apply/ IHh2; rewrite /= HH //.
+1-4: move=> HH; apply/orP; right=> /=; apply/ IHh2; rewrite ?in_Node /= HH //.
 1-3: apply/orP; by right.
-1-3,6: move=> HH; apply/orP; right=> /=; apply/ IHh21; rewrite /= HH //.
+1-3,6: move=> HH; apply/orP; right=> /=; apply/ IHh21; rewrite ?in_Node /= HH //.
 - apply/orP; by left.
 1-2: by move=>->.
 Qed.
 
-Definition insert (x : T) (h : heap) := 
+Definition insert (x : T) h := 
 merge (Node 1 x Emp Emp) h.
 
 Lemma rk_E : ((rk Emp).+1 = 1)%N.
@@ -445,9 +471,9 @@ Qed.
 
 
 Theorem insert_correct h x y :
-x ? (insert y h) = ((x == y) || (x ? h)).
+x \in (insert y h) = ((x == y) || (x \in h)).
 Proof.
-rewrite merge_spec /=; case (x == y); by case (x ? h).
+rewrite merge_spec /= !in_Node; case (x == y); by case (x \in h).
 Qed.
 
 Definition findmin h := 
@@ -458,14 +484,14 @@ None = findmin h <-> h = Emp.
 Proof. split=> [|-> //]. by case : h. Qed.
 
 Lemma LE_correct : forall h x y,
-heap_ordered h -> x ? h -> LE y h -> y <= x.
+heap_ordered h -> x \in h -> LE y h -> y <= x.
 Proof.
 elim=> [x y _ H| n x h1 IHh1 h2 IHh2 x' y' /= /andP[/andP[/andP[L1 L2 H1 H2]]]] //
  /orP[/orP[/eqP ->|/(IHh1 _ _ H1)/(_ L1)]|/(IHh2 _ _ H2)/(_ L2)] //; swapg; exact: le_trans.
 Qed.
 
 Theorem findmin_correct2 : forall h, heap_ordered h ->
-forall z, Some z = findmin h -> forall x, x ? h -> z <= x.
+forall z, Some z = findmin h -> forall x, x \in h -> z <= x.
 Proof.
 case=> [//| n x h1 h2 HO z /= [->] y /orP[/orP[/eqP ->|]|]] // H. 
 - by move: HO=> /case_heap_ordered_l /andP[/LE_correct - /(_ _ x H)].
@@ -480,15 +506,14 @@ Qed.
 
 Theorem findmin_LE_correct : forall x h,
 heap_ordered h ->
-(x ? h && LE x h) <-> (Some x = findmin h).
+((x \in h) && LE x h) <-> (Some x = findmin h).
 Proof.
 split=> [/andP[]|]; move: h H=> [] //.
 - move=> n y h1 h2 /= /andP[/andP[/andP[L1 L2 H1 H2]]]
   /orP[/orP[/eqP-> //|/(LE_correct _ _ _ H1)/(_ L1)]|/(LE_correct _ _ _ H2)/(_ L2)] XY YX;
   suffices: x = y=> [-> //|]; apply: le_anti; rewrite XY YX //.
-move=> n s h1 h2 HO [] ->; apply/andP; split=> /=. 
-- by rewrite eq_refl.
-by apply lexx.
+move=> n s h1 h2 HO [] ->; apply/andP; split=> //=. 
+by rewrite in_Node eq_refl.
 Qed.
 
 Definition deletemin h :=
@@ -555,13 +580,13 @@ by move/case_leftistheap_r.
 Qed.
 
 Theorem deletemin_spec : forall h x y,
-Some x = findmin h -> (y ? (insert x (deletemin h))) = y ? h.
+Some x = findmin h -> (y \in (insert x (deletemin h))) = (y \in h).
 Proof.
 case=> [//=|n x h1 h2 y z [->]].
 by rewrite insert_correct /deletemin merge_spec //= orbA.
 Qed.
 
-Fixpoint insert' (x : T) (h : heap) :=
+Fixpoint insert' (x : T) h :=
 if h is Node n y a b then
 let h' := Node n y a b in 
   if x <= y then
@@ -578,7 +603,7 @@ move=> _ /andP[/andP[nr RR1 RR2]] /andP[/andP[LI1 LI2 rr]].
 by rewrite IHh2.
 Qed.
 
-End LeftistDef.
+End Specifications.
 End leftistheap.
 Module WBleftistheap.
 (*Weight-biased leftist heaps are an al-
