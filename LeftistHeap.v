@@ -34,16 +34,11 @@ Inductive heap :=
 | Emp : heap
 | Node : nat -> T-> heap -> heap -> heap.
 
-
-(*Fixpoint member x h :=
-if h is Node _ y a b then (x == y) || (member x a) || (member x b) else false.
-
-Notation "x \in h" := (member x h) (at level 0).*)
-
 End LeftistDef.
 Arguments Node {T}.
 Arguments Emp {T}.
-Notation "'[' tl '|' n ',' x '|' tr ']'" := (Node n x tl tr) (at level 0).
+Notation "[ tl | n , x | tr ]" := (Node n x tl tr) (at level 0).
+Notation "[//]" := Emp (at level 200).
 
 Section Specifications.
 Variables (T : ordType).
@@ -75,6 +70,11 @@ Lemma eqheap_Node (x1 x2 : T) n1 n2 tr1 tr2 tl1 tl2 :
   ([tl1 | n1, x1 | tr1] == [tl2 | n2, x2 | tr2]) = (n1 == n2) && (x1 == x2) && (tl1 == tl2) && (tr1 == tr2).
 Proof. by []. Qed.
 
+Lemma eqNode1xEE x y: ([[//] | 1, x | [//]] == [[//] | 1, y | [//]]) = (x == y).
+Proof.
+  by rewrite eqheap_Node !eq_refl; case (x == y).
+Qed.
+
 Fixpoint mem_heap (h : heap T) :=
   if h is Node _ y tl tr then xpredU2 y (mem_heap tl) (mem_heap tr) else xpred0.
 
@@ -90,6 +90,30 @@ Lemma in_Node x y n tl tr:
   x \in [tl | n, y | tr] = (x == y) || (x \in tl) || (x \in tr).
 Proof. by []. Qed.
 
+Section Conut.
+Variables a : pred T.
+
+Fixpoint count h : nat := if h is [tl| _, x |tr] then a x + count
+ tl + count tr else 0.
+
+Lemma count_Node tl tr y n: count [tl| n, y |tr] = a y + count tl + count tr.
+Proof. by []. Qed.
+
+Lemma count_E : count ([//]) = 0.
+Proof. by []. Qed.
+
+Lemma count_NodexEE n y : count [[//]| n, y |[//]] = a y.
+Proof. move=> /=. by rewrite !addn0. Qed.
+
+Let countE := (count_Node, count_E, count_NodexEE).
+End Conut.
+
+Lemma in_count x h: x \in h = (0 < count (xpred1 x) h)%N.
+Proof.
+elim h=> // n y h1 IHh1 h2 IHh2; rewrite in_Node /= !addn_gt0 IHh1 IHh2 eq_sym; by case: (y == x).
+Qed.
+
+
 Definition empty h :=
 if h is Emp then true else false.
 
@@ -102,6 +126,10 @@ if h is Node n y a b then (x <= y) else true.
 Fixpoint heap_ordered h : bool :=
 if h is Node n x tl tr then (LE x tl) && (LE x tr) && (heap_ordered tl) && (heap_ordered tr) else true.
 
+Fact heap_ordered_NodexEE x : heap_ordered [[//]| 1, x |[//]].
+Proof. by []. Qed.
+
+Fact heap_ordered_E : heap_ordered ([//]). Proof. by []. Qed.
 
 Fixpoint rk h : nat := if h is Node _ _ _ b then (rk b).+1 else O.
 
@@ -110,6 +138,11 @@ match h with
 | Node n x tl tr => (n == (rk tr).+1) && (rank_rk tl) && (rank_rk tr)
 | Emp           => true
 end.
+
+Fact rank_rk_NodexEE x : rank_rk [[//]| 1, x |[//]].
+Proof. by []. Qed.
+
+Fact rank_rk_E : rank_rk ([//]). Proof. by []. Qed.
 
 (** The (general) rank of a tree is the length of the shortest path from the root to leaves *)
 Fixpoint grank h : nat :=
@@ -126,6 +159,11 @@ Fixpoint leftist_inv h : bool :=
 if h is Node n x tl tr then
   (rank tr <= rank tl)%N && (leftist_inv tl) && (leftist_inv tr)
 else true.
+
+Fact leftist_inv_NodexEE x : leftist_inv [[//]| 1, x |[//]].
+Proof. by []. Qed.
+
+Fact leftist_inv_E : leftist_inv ([//]). Proof. by []. Qed.
 
 Lemma rank_correct : forall h, rank_rk h -> rk h = rank h.
 Proof. by move=> [] //= n _ tl tr /andP[/andP[/eqP]]. Qed.
@@ -182,9 +220,9 @@ Lemma case_leftist_rank_inv n x tl tr:
 leftist_rank_inv (Node n x tl tr) -> (n == (rank tr).+1) &&
 (leftist_rank_inv tr && leftist_rank_inv tl && (rank tr <= rank tl)%N).
 Proof.
-  move=> LI. move: LI (LI)=> /case_leftist_rank_inv_rl -> /andP[_ H].
-  move: H (H)=> /case_rank_rk /andP[/andP[/eqP-> _ /rank_correct ->]].
-  by rewrite eq_refl.
+move=> LI. move: LI (LI)=> /case_leftist_rank_inv_rl -> /andP[_ H].
+move: H (H)=> /case_rank_rk /andP[/andP[/eqP-> _ /rank_correct ->]].
+by rewrite eq_refl.
 Qed.
 
 
@@ -293,6 +331,12 @@ Qed.
 
 Definition leftistheap h :=
 leftist_inv h && rank_rk h && heap_ordered h.
+
+Fact leftistheap_NodexEE x : leftistheap [[//]| 1, x |[//]].
+Proof. by rewrite /leftistheap rank_rk_NodexEE heap_ordered_NodexEE leftist_inv_NodexEE. Qed.
+
+Fact leftistheap_E : leftistheap ([//]).
+Proof. by rewrite /leftistheap rank_rk_E heap_ordered_E leftist_inv_E. Qed.
 
 Fixpoint merge a :=
 if a is Node n x a1 b1 then
@@ -410,33 +454,31 @@ move=> /andP[/andP[LI1 RR1 HO1]] /andP[/andP[LI2 RR2 HO2]]; apply/andP; split.
 by apply: merge_preserve_HO_inv. 
 Qed.
 Hint Rewrite in_Node : core.
-Lemma makeT_spec h1 h2 x y :
-x \in (makeT y h1 h2) = ((x == y) || (x \in h1) || (x \in h2)).
+
+Lemma makeT_spec h1 h2 x a: 
+count a (makeT x h1 h2) = a x + count a h1 + count a h2.
 Proof.
-makeT_casesxy (rank h2) (rank h1).
-apply/idP/idP=> //. by rewrite -orbA [(x \in h1) || _]orbC orbA.
+by makeT_casesxy (rank h2) (rank h1)=> /=; ssrnatlia.
 Qed.
 
-Theorem merge_spec  h1 h2 x :
+Lemma makeT_in_spec h1 h2 x y :
+x \in (makeT y h1 h2) = ((x == y) || (x \in h1) || (x \in h2)).
+Proof.
+by rewrite !in_count makeT_spec eq_sym; case : (x == y)=> /=; rewrite !addn_gt0.
+Qed.
+
+Theorem merge_spec h1 h2 a: 
+  count a (merge h1 h2) = count a h1 + count a h2.
+Proof.
+elim: h1 h2=> [h2|n x h1 IHh1 h2 IHh2]; rewrite ?merge_E_h //.
+elim=> [/=|m y h21 IHh21 h22 IHh22]; first by ssrnatlia.
+- by merge_casesxy x y; rewrite makeT_spec; rewrite ?(IHh2, IHh22) /=; ssrnatlia.
+Qed.
+
+Theorem merge_in_spec  h1 h2 x :
 x \in (merge h1 h2) = ((x \in h1) || (x \in h2)).
 Proof.
-apply/idP/idP.
-- elim: h1 h2=> [h2|n y h1 IHh1 h2 IHh2].
-- by rewrite merge_E_h=>->.
-- elim=> [|m z h21 IHh21 h22 IHh22]; first by rewrite merge_h_E=>->.
-- merge_casesxy y z; rewrite makeT_spec !in_Node => /orP[->|] //.
-- by move=> /IHh2 /= /orP[]; rewrite ?in_Node=> /= ->.
-- move=> /IHh22 /= /orP[]; rewrite ?in_Node=> -> //. apply/orP; by right.
-
-- elim: h1 h2 => [h |n y h11 IHh1 h22 IHh2]; rewrite ?merge_E_h //.
-- elim=> [/orP [] //|m z h12 IHh12 h21 IHh21]; rewrite ?merge_h_E ?in_Node.
-merge_casesxy y z; move=> /orP[/orP[/orP[]|]|/orP[/orP[]|]]; rewrite makeT_spec.
-1,2: by move=>->.
-1-4: move=> HH; apply/orP; right=> /=; apply/ IHh2; rewrite ?in_Node /= HH //.
-1-3: apply/orP; by right.
-1-3,6: move=> HH; apply/orP; right=> /=; apply/ IHh21; rewrite ?in_Node /= HH //.
-- apply/orP; by left.
-1-2: by move=>->.
+by rewrite !in_count merge_spec !addn_gt0.
 Qed.
 
 Definition insert (x : T) h := 
@@ -469,11 +511,16 @@ Proof.
 by move=> h x Rh; apply merge_preserve_LH.
 Qed.
 
+Theorem insert_spec h x a : 
+  count a (insert x h) = a x + count a h.
+Proof.
+by rewrite merge_spec /=; ssrnatlia.
+Qed.
 
-Theorem insert_correct h x y :
+Theorem insert_in_spec h x y :
 x \in (insert y h) = ((x == y) || (x \in h)).
 Proof.
-rewrite merge_spec /= !in_Node; case (x == y); by case (x \in h).
+rewrite merge_in_spec /= !in_Node; case (x == y); by case (x \in h).
 Qed.
 
 Definition findmin h := 
@@ -579,11 +626,17 @@ case=> //=n x h1 h2 H; apply merge_preserve_LH; move: H.
 by move/case_leftistheap_r.
 Qed.
 
-Theorem deletemin_spec : forall h x y,
+Theorem deletemin_spec h x: 
+  Some x = findmin h -> (count^~ (insert x (deletemin h)) =1 count^~ h).
+Proof.
+by case: h=> // n y h1 h2 /= [->] a; rewrite insert_spec merge_spec addnA.
+Qed.
+
+Theorem deletemin_in_spec : forall h x y,
 Some x = findmin h -> (y \in (insert x (deletemin h))) = (y \in h).
 Proof.
 case=> [//=|n x h1 h2 y z [->]].
-by rewrite insert_correct /deletemin merge_spec //= orbA.
+by rewrite insert_in_spec /deletemin merge_in_spec //= orbA.
 Qed.
 
 Fixpoint insert' (x : T) h :=
@@ -602,6 +655,156 @@ case H : (x <= y); merge_cases. rewrite /makeT => /ltn_geF -> //.
 move=> _ /andP[/andP[nr RR1 RR2]] /andP[/andP[LI1 LI2 rr]].
 by rewrite IHh2.
 Qed.
+
+Implicit Type hh : seq (option (heap T)).
+
+Fixpoint seq_to_seqheap (st : seq T) :=
+if st is h :: t then
+  cons [[//]| 1, h |[//]] (seq_to_seqheap t)
+else [::].
+
+Fixpoint count_sseq a hh := 
+  if hh is sh :: hh' then 
+    if sh is some h then count a h + count_sseq a hh' 
+    else count_sseq a hh'
+  else 0.
+
+Fixpoint count_seq a (sh : seq (heap T)) := 
+  if sh is h :: sh' then count a h + count_seq a sh' else 0.
+
+Theorem seq_to_seqheap_spec s: count_seq^~ (seq_to_seqheap s) =1 seq.count^~ s.
+Proof.
+move=> a; elim: s=> //= x s->; ssrnatlia.
+Qed.
+
+Fixpoint fromseqheap_push h1 hh :=
+  match hh with
+  | None :: hh' | [::] as hh' => (some h1) :: hh'
+  | (some h2) :: hh' => None :: fromseqheap_push (merge h2 h1) hh'
+  end.
+
+Fixpoint fromseqheap_pop h1 hh :=
+  if hh is sh2 :: hh' then
+    let h2 := if sh2 is some h then h else [//] in
+   fromseqheap_pop (merge h2 h1) hh' else h1.
+
+Fixpoint fromseqheap_rec hh sh  :=
+  match sh with
+  | [:: x1, x2 & h'] => let h1 := merge x1 x2 in
+    fromseqheap_rec (fromseqheap_push h1 hh) h'
+  | [:: h] => fromseqheap_pop h hh
+  | [::] => fromseqheap_pop ([//]) hh
+  end.
+
+Definition fromseqheap := (fromseqheap_rec [::]).
+
+Fixpoint fromseqheap_rec1 hh sh :=
+  if sh is x :: h then fromseqheap_rec1 (fromseqheap_push x hh) h else fromseqheap_pop ([//]) hh.
+
+Lemma fromseqheapE sh : fromseqheap sh = fromseqheap_rec1 [::] sh.
+Proof.
+transitivity (fromseqheap_rec1 [:: None] sh); last by case: sh.
+rewrite /fromseqheap; move: [::] {2}_.+1 (ltnSn (size sh)./2) => hh n.
+elim: n => // n IHn in hh sh *. case: sh => [|x [|y s]] //=; by rewrite ?merge_h_E=> //= /IHn->.
+Qed.
+
+Definition fromseq := fromseqheap \o seq_to_seqheap.
+
+Lemma fromseqheap_pop_spec a h hh : 
+  count a (fromseqheap_pop h hh) = count_sseq a hh + count a h.
+Proof.
+elim: hh => [|[h'|] shh IHhh] //= in h *; by rewrite IHhh merge_spec; ssrnatlia.
+Qed.
+
+Lemma fromseqheap_push_spec h hh a: 
+  count_sseq a (fromseqheap_push h hh )= count a h + count_sseq a hh.
+Proof.
+elim: hh=> [|[sh|] hh' IHhh] //= in h *. by rewrite IHhh merge_spec; ssrnatlia.
+Qed.
+
+
+Lemma fromseqheap_rec1_spec sh hh a: 
+  count a (fromseqheap_rec1 hh sh) = count_sseq a hh + count_seq a sh.
+Proof.
+elim: sh => [|h sh IHsh] /= in hh *.
+  rewrite ?fromseqheap_pop_spec //. by rewrite IHsh fromseqheap_push_spec; ssrnatlia.
+Qed.
+
+Lemma fromseqheap_spec sh : 
+ count^~ (fromseqheap sh) =1 count_seq^~ sh.
+Proof.
+move=> a; by rewrite fromseqheapE fromseqheap_rec1_spec.
+Qed.
+
+Theorem fromseq_cspec (s : seq T): 
+  seq.count^~ s =1 count^~ (fromseq s).
+Proof.
+move=> a; by rewrite /fromseq /= fromseqheap_spec seq_to_seqheap_spec.
+Qed.
+
+Section Invariant.
+Definition invariant := heap T -> bool.
+
+Variables inv : invariant.
+
+Hypothesis merge_preserve_invariat : forall h1 h2, inv h1 -> inv h2 -> inv (merge h1 h2).
+Hypothesis inv_E : inv ([//]).
+Hypothesis inv_NodexEE : forall x, inv [[//]| 1, x |[//]].
+Hint Resolve inv_E : core.
+
+Definition some_inv sh := if sh is some h then inv h else true.
+
+Lemma inv_fromseqheap_pop h sh: 
+  (all some_inv sh) -> inv h -> inv (fromseqheap_pop h sh).
+Proof.
+elim: sh => [|[h'|] shh IHhh] //= in h *=> /andP[HH' ASH HH]; apply: IHhh=> //.
+by apply: merge_preserve_invariat.
+Qed.
+
+Lemma all_inv_fromseqheap_push h hh:
+  inv h -> (all some_inv hh) ->
+  all some_inv (fromseqheap_push h hh) = (inv h) && (all some_inv hh).
+Proof.
+by elim: hh=> [|[sh|] hh' IHhh] //= in h *=> HH /andP[SH AHH];
+ rewrite IHhh ?merge_preserve_invariat // HH SH.
+Qed.
+
+Lemma inv_fromseqheap_rec1 hh sh : 
+(all some_inv  hh) -> (all inv sh) -> (inv (fromseqheap_rec1 hh sh)).
+Proof.
+elim: sh => [|h sh IHsh] /= in hh *=> AHH; rewrite ?inv_fromseqheap_pop //.
+move=> /andP[HH AHS]. by apply: IHsh; rewrite ?all_inv_fromseqheap_push ?HH ?AHS ?AHH.
+Qed.
+
+
+Lemma inv_fromseqheap sh : 
+all inv sh -> inv (fromseqheap sh).
+Proof.
+move=> ASH; by rewrite fromseqheapE inv_fromseqheap_rec1.
+Qed.
+
+Lemma all_inv_seq_toseqheap s : 
+all inv (seq_to_seqheap s).
+Proof. elim: s=> //= a h->; by rewrite inv_NodexEE. Qed.
+
+Lemma inv_fromseq s : inv (fromseq s).
+Proof.
+by rewrite /fromseq /= inv_fromseqheap // all_inv_seq_toseqheap.
+Qed.
+End Invariant.
+
+Print inv_fromseq.
+Definition rank_rk_fromseq : forall s, rank_rk (fromseq s) := 
+  inv_fromseq rank_rk merge_preserve_rk_inv rank_rk_E rank_rk_NodexEE.
+
+Definition heap_ordered_fromseq : forall s, heap_ordered (fromseq s) := 
+  inv_fromseq heap_ordered merge_preserve_HO_inv heap_ordered_E heap_ordered_NodexEE.
+
+Definition leftist_inv_fromseq : forall s, leftist_inv (fromseq s) := 
+  inv_fromseq leftist_inv merge_preserve_LI_inv leftist_inv_E leftist_inv_NodexEE.
+
+Definition leftistheap_fromseq : forall s, leftistheap (fromseq s) := 
+  inv_fromseq leftistheap merge_preserve_LH leftistheap_E leftistheap_NodexEE.
 
 End Specifications.
 End leftistheap.
@@ -632,7 +835,7 @@ Definition isEmpty (h : heap) :=
 if h is Emp then true else false.
 
 
-Program Fixpoint merge (a b : heap) {measure (size a + size b)} : heap :=
+(*Program Fixpoint merge (a b : heap) {measure (size a + size b)} : heap :=
 match a, b with
 | h, Emp => h
 | Emp, h => h
@@ -694,7 +897,7 @@ Qed.
 Next Obligation.
 move=> /=;
 rewrite -!plusE; lia.
-Qed.
+Qed.*)
 
 End WBLeftistDef.
 End WBleftistheap.
