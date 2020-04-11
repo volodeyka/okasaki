@@ -13,6 +13,21 @@ Inductive Tree := E | T : Tree -> Elem -> Tree -> Tree.
 
 Definition EmptyTree := E.
 
+Fixpoint eqtree t1 t2 :=
+match t1, t2 with
+| E, E => true
+| T l1 x1 r1, T l2 x2 r2 => [&& (x1 == x2), eqtree l1 l2 & eqtree r1 r2]
+| _, _ => false
+end.
+
+Lemma eqtreeP : Equality.axiom eqtree.
+Proof.
+elim=> [| l IHl x r IHr] /=; case; try by constructor.
+move=> l' x' r'. apply: (iffP and3P); case.
+- by move=> eq eqll eqrr; rewrite (eqP eq) ((IHl l') eqll) ((IHr r') eqrr).
+move=> ll eq rr; split; by [apply/eqP | apply/IHl | apply/IHr].
+Qed.
+
 Fixpoint LT (x : Elem) (Tr : Tree) : bool :=
 if Tr is T l y r then [&& LT x l, LT x r & (x < y)] else true.
 
@@ -55,11 +70,47 @@ apply/and3P; split.
 by apply: (lt_trans yx xx').
 Qed.
 
-Fixpoint member (x : Elem) (Tr : Tree) : bool :=
-if Tr is T l y r then
-  if x < y then member x l
-  else if x > y then member x r else true 
-else false.
+Canonical tree_eqMixin := EqMixin eqtreeP.
+Canonical tree_eqType := Eval hnf in EqType Tree tree_eqMixin.
+
+Lemma eqtreeE : eqtree = eq_op.
+Proof. by []. Qed.
+
+Fixpoint mem_tree t :=
+  if t is T l x r then xpredU1 x (xpredU (mem_tree l) (mem_tree r)) else xpred0.
+
+Definition tree_eqclass := Tree.
+Identity Coercion tree_of_eqclass : tree_eqclass >-> Tree.
+Coercion pred_of_tree (t : tree_eqclass) : {pred Elem} := mem_tree t.
+Canonical tree_predType := PredType pred_of_tree.
+(* The line below makes mem_seq a canonical instance of topred. *)
+Canonical mem_seq_predType := PredType mem_tree.
+
+Lemma is_member x l y r : x \in T l y r = [|| x == y, x \in l | x \in r].
+Proof. by []. Qed.
+
+Lemma is_left (l r : Tree) (x y : Elem) (BS : BSTOrder (T l y r)) : x < y -> x \in T l y r = (x \in l).
+Proof.
+move=> xy. rewrite is_member. apply/or3P.
+move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr]. case: ifP=> ->; first by apply/or3P=> /=; case: (x == y).
+apply/or3P=> /=. rewrite negb_or. apply/andP; split; first by rewrite lt_eqF.
+elim: (r) L=> //= l' IHl' x' r' IHr' /and3P[LTl' LTr' yx']. rewrite is_member !negb_or. apply/and3P; split.
+- by rewrite (lt_eqF (lt_trans xy yx')).
+- by rewrite IHl'.
+by rewrite IHr'.
+Qed.
+
+Lemma is_right (l r : Tree) (x y : Elem) (BS : BSTOrder (T l y r)) : x > y -> x \in T l y r = (x \in r).
+Proof.
+move=> yx. rewrite is_member. apply/or3P.
+move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr]. case: ifP=> ->; first by apply/or3P=> /=; case: (x == y); case: (x \in l).
+apply/or3P=> /=. rewrite !negb_or. apply/and3P; split; first by rewrite gt_eqF.
+elim: (l) G=> //= l' IHl' x' r' IHr' /and3P[GTl' GTr' x'y]. rewrite is_member !negb_or. apply/and3P; split.
+- by rewrite (gt_eqF (lt_trans x'y yx)).
+- by rewrite IHl'.
+by rewrite IHr'.
+by [].
+Qed.
 
 (** member function with at most d + 1 comparisons where d is the depth of a tree*)
 Fixpoint candidate (x : Elem) (Tr : Tree) (cand : option Elem) : bool :=
@@ -85,15 +136,14 @@ elim: Tr L=> [| l IHl x' r IHr L /=]; first by rewrite /= eqxx.
 move: (LTC _ _ _ _ L)=> /and3P [LTl LTr xx']; by rewrite xx' IHl.
 Qed.
 
-Lemma memberE (x : Elem) (Tr : Tree) (BS : BSTOrder Tr) : member x Tr = member' x Tr.
+Lemma memberE (x : Elem) (Tr : Tree) (BS : BSTOrder Tr) : x \in Tr = member' x Tr.
 Proof.
 rewrite/member'.
 elim: Tr BS=> //= l IHl x' r IHr BS.
 move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr]. case: ltgtP.
-- move=> xx'; by apply: IHl.
-- move=> x'x; rewrite IHr //; apply: nhd_member=> //.
-  by rewrite neq_lt; apply/orP; right.
-move=> eq; by rewrite eq mem_in_hd.
+- move=> xx'. rewrite is_left //. by apply: IHl.
+- move=> x'x. rewrite is_right // IHr //; apply: nhd_member=> //. by rewrite gt_eqF.
+move=> eq; rewrite eq mem_in_hd // is_member eq_refl //.
 Qed.
 
 Fixpoint insert (x : Elem) (Tr : Tree) : Tree :=
@@ -103,19 +153,21 @@ if Tr is T a y b then
   else T a y b
 else T E x E.
 
-Lemma member_LT (x x' : Elem) (Tr : Tree) : LT x Tr && (member x' Tr) -> x < x'.
+Lemma member_LT (x x' : Elem) (Tr : Tree) (BS : BSTOrder Tr) : LT x Tr && (x' \in Tr) -> x < x'.
 Proof.
-elim: Tr=> //= l IHl y r IHr /andP[/and3P[LTl LTr xy] M]. case: (ltgtP x' y).
-- by move=> x'y; rewrite x'y in M; rewrite IHl //; apply/andP.
-- by move=> yx'; rewrite yx' in M; rewrite lt_gtF in M; rewrite ?IHr //; apply/andP.
+elim: Tr BS=> // l IHl y r IHr BS /andP[/and3P[LTl LTr xy] M]. case: (ltgtP x' y);
+move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr].
+- by move=> x'y; rewrite is_left in M=> //; rewrite IHl //; apply/andP.
+- by move=> yx'; rewrite is_right in M=> //; rewrite ?IHr //; apply/andP.
 by move=> x'y; rewrite -x'y in xy.
 Qed.
 
-Lemma member_GT (x x' : Elem) (Tr : Tree) : GT x Tr && (member x' Tr) -> x > x'.
+Lemma member_GT (x x' : Elem) (Tr : Tree) (BS : BSTOrder Tr) : GT x Tr && (x' \in Tr) -> x > x'.
 Proof.
-elim: Tr=> //= l IHl y r IHr /andP[/and3P[GTl GTr yx] M]. case: (ltgtP x' y).
-- by move=> x'y; rewrite x'y in M; rewrite IHl //; apply/andP.
-- by move=> yx'; rewrite yx' in M; rewrite lt_gtF in M; rewrite ?IHr //; apply/andP.
+elim: Tr BS=> //= l IHl y r IHr BS /andP[/and3P[GTl GTr yx] M]. case: (ltgtP x' y);
+move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr].
+- by move=> x'y; rewrite is_left in M=> //; rewrite IHl //; apply/andP.
+- by move=> yx'; rewrite is_right in M; rewrite ?IHr //; apply/andP.
 by move=> x'y; rewrite -x'y in yx.
 Qed.
 
@@ -185,25 +237,29 @@ rewrite/all in IHr'; by rewrite IHr'.
 Admitted.
 
 Lemma mem_hVtr (x y : Elem) (Tr : Tree) (BS : BSTOrder Tr) :
-  member x (insert y Tr) = (x == y) || (member x Tr).
+  x \in (insert y Tr) = (x == y) || (x \in Tr).
 Proof.
 elim: Tr BS=> [_ | l IHl x' r IHr BS].
-- case: ltgtP=> neq //=; first by rewrite neq.
-  - by rewrite lt_gtF neq.
-  by rewrite neq ltxx.
-move=> /=. 
-case: ltgtP=> x'y //=; case: ltgtP=> xx' //=; move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr];
-by [apply: IHl | rewrite gt_eqF // (lt_trans x'y xx') | case: (x == y) |
- rewrite lt_eqF // (lt_trans xx' x'y) | apply: IHr | case: (x == y) |
- rewrite lt_eqF //; rewrite -x'y in xx' | rewrite gt_eqF //; rewrite -x'y in xx' |
- case: (x == y)].
+- case: ltgtP=> neq //=; first by rewrite !is_member /= lt_eqF.
+  - by rewrite !is_member /= gt_eqF.
+  by rewrite is_member neq eq_refl.
+case: ltgtP=> xy /=; case: ltgtP=> x'y; rewrite !is_member //=; move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr].
+- rewrite IHl // (lt_eqF xy) //.
+- rewrite IHr // (lt_eqF xy) //.
+- rewrite IHl // (gt_eqF xy) //.
+- rewrite IHr // (gt_eqF xy) //.
+- by rewrite IHl // xy eq_refl /=; case: (y == x').
+- by rewrite IHr // xy eq_refl /= gt_eqF //=; case: (y \in l).
+rewrite xy x'y eq_refl //.
 Qed.
 
-Lemma already_mem (x : Elem) (Tr : Tree) (BS : BSTOrder Tr) : member x Tr -> insert x Tr = Tr.
+Lemma already_mem (x : Elem) (Tr : Tree) (BS : BSTOrder Tr) : x \in Tr -> insert x Tr = Tr.
 Proof.
 elim: Tr BS=> //= l IHl y r IHr /and4P[GTl LTr BSl BSr]. case: ltgtP=> xy //=.
-- move=> Mxl. by rewrite (IHl BSl Mxl).
-move=> Mxr. by rewrite (IHr BSr Mxr).
+- rewrite is_left //=. by move=> Mxl; rewrite (IHl BSl Mxl).
+  by apply/and4P.
+rewrite is_right //=. by move=> Mxr; rewrite (IHr BSr Mxr).
+by apply/and4P.
 Qed.
 
 End BinSearchTree.
