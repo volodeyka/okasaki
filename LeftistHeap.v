@@ -39,7 +39,44 @@ Arguments Emp {T}.
 Notation "[ tl | n , x | tr ]" := (Node n x tl tr) (at level 0).
 Notation "'[|,|]'" := Emp (at level 200).
 
+Module Measure.
+Structure mixin_of {T : ordType} (measure : heap T -> nat) :=
+  Mixin {
+    measure1            : nat;
+    f                   : nat -> nat -> nat;
+    measureNode         : forall tl tr n x, measure [tl| x, n |tr] = f (measure tl) (measure tr);
+    measure_NodexEE     : f (measure ([|,|])) (measure ([|,|])) = measure1;
+    measure_Node_E      : forall h1 h2 n x, (measure ([|,|]) < measure [h1 | n, x | h2])%N
+  }.
+
+Notation class_of := mixin_of (only parsing).
+
+Section classdef.
+
+Structure type T := Pack { sort; _ : @class_of T sort }.
+
+Local Coercion sort : type >-> Funclass.
+
+Variables (T : ordType) (cT : (type T)).
+
+(** Projection out of [type] *)
+Definition class :=
+  let: Pack _ c := cT return class_of cT in c.
+
+End classdef.
+Module Exports.
+
+Coercion sort : type >-> Funclass.
+(** Some shorthands *)
+Notation measureType := type.
+
+Notation MeasureMixin := Mixin.
+
+End Exports.
+End Measure.
+
 Section Specifications.
+Export Measure.Exports.
 Variables (T : ordType).
 Implicit Type h : heap T.
 
@@ -118,54 +155,51 @@ Proof. case h; by constructor. Qed.
 Definition LE x h : bool := 
 if h is Node n y a b then (x <= y) else true.
 
+Section Measure.
+Variables measure : measureType T.
+Definition measure1 : nat := Measure.measure1 _ (Measure.class T measure).
+Definition measure_NodexEE := Measure.measure_NodexEE _ (Measure.class T measure).
+Definition measureNode := Measure.measureNode _ (Measure.class T measure).
+Definition measure_Node_E := Measure.measure_Node_E _ (Measure.class T measure).
+Definition f := Measure.f _ (Measure.class T measure).
+Hint Resolve measure_Node_E : core.
+
+Fixpoint measure_inv h : bool :=
+match h with
+| [tl| n, x |tr] => [&& (n == measure h), (measure_inv tl) & (measure_inv tr)]
+| [|,|]            => true
+end.
+
+Lemma measure_inv_NodexEE x : measure_inv [[|,|]| measure1, x |[|,|]].
+Proof.
+  move=> /=. by rewrite measureNode measure_NodexEE eq_refl.
+Qed.
+Hint Resolve measure_inv_NodexEE : core.
+
 Fixpoint heap_ordered h : bool :=
 if h is Node n x tl tr then
   [&& (LE x tl), (LE x tr), (heap_ordered tl) & (heap_ordered tr)]
 else true.
 
-Fact heap_ordered_NodexEE x : heap_ordered [[|,|]| 1, x | [|,|]].
+Fact heap_ordered_NodexEE n x : heap_ordered [[|,|]| n, x | [|,|]].
 Proof. by []. Qed.
-
+Hint Resolve heap_ordered_NodexEE: core.
 Fact heap_ordered_E : heap_ordered ([|,|]). Proof. by []. Qed.
 
-Fixpoint rk h : nat := if h is Node _ _ _ b then (rk b).+1 else O.
-
-Fixpoint rank_rk h : bool :=
-match h with
-| Node n x tl tr => [&& (n == (rk tr).+1), (rank_rk tl) & (rank_rk tr)]
-| Emp            => true
-end.
-
-Fact rank_rk_NodexEE x : rank_rk [[|,|]| 1, x | [|,|]].
-Proof. by []. Qed.
-
-Fact rank_rk_E : rank_rk ([|,|]). Proof. by []. Qed.
-
-(** The (general) rank of a tree is the length of the shortest path from the root to leaves *)
-Fixpoint grank h : nat :=
-  if h is Node _ _ l r then
-    (minn (grank l) (grank r)).+1
-  else 0.
-
-Lemma rank_eq0 h : (rk h == 0) = (h == Emp).
-Proof. by case: h. Qed.
-
-Fixpoint rank h : nat := if h is Node r _ _ _ then r else O.
+Fact measure_E : measure_inv ([|,|]). Proof. by []. Qed.
 
 Fixpoint leftist_inv h : bool :=
 if h is Node n x tl tr then
-  [&& (rank tr <= rank tl)%N, (leftist_inv tl) & (leftist_inv tr)]
+  [&& (measure tr <= measure tl)%N, (leftist_inv tl) & (leftist_inv tr)]
 else true.
 
-Fact leftist_inv_NodexEE x : leftist_inv [[|,|]| 1, x | [|,|]].
-Proof. by []. Qed.
+Fact leftist_inv_NodexEE n x : leftist_inv [[|,|]| n, x | [|,|]].
+Proof. move=> /=; by rewrite leqnn. Qed.
+Hint Resolve leftist_inv_NodexEE : core.
 
 Fact leftist_inv_E : leftist_inv ([|,|]). Proof. by []. Qed.
 
-Lemma rank_correct : forall h, rank_rk h -> rk h = rank h.
-Proof. by move=> [] //= n _ tl tr /and3P[/eqP]. Qed.
-
-Inductive side := r | l.
+Variant side := r | l.
 
 Definition spine := seq side.
 
@@ -190,43 +224,33 @@ Proof. move=> [] //=. Qed.
 Lemma case_spine_in : forall side s n x tl tr, 
 spine_in (side :: s) (Node n x tl tr) -> 
 if side is r then spine_in s tr else spine_in s tl.
-Proof. move=> [] //=. Qed. 
+Proof. move=> [] //=. Qed.
 
-Definition leftist_rank_inv h := leftist_inv h && rank_rk h.
+Definition leftist_measure_inv h := leftist_inv h && measure_inv h.
 
-Lemma case_leftist_rank_inv_r n x tl tr :
-leftist_rank_inv (Node n x tl tr) -> leftist_rank_inv tr.
+Lemma case_leftist_measure_inv_r n x tl tr :
+leftist_measure_inv (Node n x tl tr) -> leftist_measure_inv tr.
 Proof.
-by rewrite /leftist_rank_inv /= => /and3P[/and3P[_ _ -> _ /andP[]]].
+by rewrite /leftist_measure_inv /= => /and3P[/and3P[_ _ -> _ /andP[]]].
 Qed.
 
-Lemma case_leftist_rank_inv_rl n x tl tr:
-leftist_rank_inv (Node n x tl tr) -> 
-[&& leftist_rank_inv tr, leftist_rank_inv tl & (rank tr <= rank tl)%N].
+Lemma case_leftist_measure_inv_rl n x tl tr:
+leftist_measure_inv (Node n x tl tr) -> 
+[&& leftist_measure_inv tr, leftist_measure_inv tl & (measure tr <= measure tl)%N].
 Proof.
-by rewrite /leftist_rank_inv => /andP[] /= => /and3P[->->-> /and3P[_ ->->]].
+by rewrite /leftist_measure_inv => /andP[] /= => /and3P[->->-> /and3P[_ ->->]].
 Qed.
 
+Lemma case_measure_inv n y h1 h2 : 
+measure_inv (Node n y h1 h2) -> [&& (n == f (measure h1) (measure h2)), (measure_inv h1) & (measure_inv h2)].
+Proof. move=> /=; by rewrite measureNode. Qed.
 
-Lemma case_rank_rk n y h1 h2 : 
-rank_rk (Node n y h1 h2) -> [&& (n == (rk h2).+1), (rank_rk h1) & (rank_rk h2)].
-Proof. by []. Qed.
-
-Lemma case_leftist_rank_inv n x tl tr: 
-leftist_rank_inv (Node n x tl tr) -> (n == (rank tr).+1) &&
-[&& leftist_rank_inv tr, leftist_rank_inv tl & (rank tr <= rank tl)%N].
+Lemma case_leftist_measure_inv n x tl tr: 
+leftist_measure_inv (Node n x tl tr) -> (n == f (measure tl) (measure tr)) &&
+[&& leftist_measure_inv tr, leftist_measure_inv tl & (measure tr <= measure tl)%N].
 Proof.
-move=> LI. move: LI (LI)=> /case_leftist_rank_inv_rl -> /andP[_ H].
-move: H (H)=> /case_rank_rk /and3P[/eqP-> _ /rank_correct ->].
-by rewrite eq_refl.
-Qed.
-
-
-Theorem grank_rk h : leftist_rank_inv h -> grank h = rank h.
-Proof.
-elim: h=> // n x h1 IHh1 h2 IHh2 
-          /case_leftist_rank_inv/andP[/= /eqP -> /and3P[L1 L2]] /=. 
-rewrite IHh1 // IHh2 //. by rewrite minnC ?Order.NatOrder.minnE=> ->.
+move=> LI. move: LI (LI)=> /case_leftist_measure_inv_rl -> /andP[_] /= /and3P[]; 
+by rewrite measureNode=>->.
 Qed.
 
 Lemma case_heap_ordered n y h1 h2 : 
@@ -249,7 +273,7 @@ Qed.
 Ltac swapg := apply swap_tact.
 
 Lemma case_leftist_inv n y h1 h2 : 
-leftist_inv (Node n y h1 h2) -> [&& (rank h2 <= rank h1)%N, leftist_inv h1 & leftist_inv h2].
+leftist_inv (Node n y h1 h2) -> [&& (measure h2 <= measure h1)%N, leftist_inv h1 & leftist_inv h2].
 Proof. by []. Qed.
 
 Lemma right_spine_ex : forall h, exists s, Right s && spine_in s h.
@@ -259,39 +283,13 @@ elim=> [|n s hl _ hr [] s'].
 by exists (r :: s').
 Qed.
 
-Lemma length_right_spine : forall h s, 
-leftist_rank_inv h -> Right s -> spine_in s h ->
-length s = rank h.
-Proof.
-move=> h s /andP [] _ RC; move: (RC)=> /rank_correct <-.
-elim: h s RC=> 
-[[|[]]|n x tl IHhl tr IHtr [_ _|[s /= /and3P[_ RRl RRr] |]]] //= R S.
-apply/eqnP=> /=. apply/eqP. by apply: IHtr.
-Qed.
-
 Lemma spine_in_E s : spine_in s Emp -> s = [::].
 Proof. by case: s=> [|[]] //=. Qed.
 
-Theorem rigth_spine_shortest : 
-forall H s1 s2, Right s1 -> leftist_rank_inv H -> spine_in s1 H -> spine_in s2 H ->
-(length s1 <= length s2)%nat.
-Proof. 
-elim=>
-[s1 s2 _ _ /spine_in_E->|
-n x tl IHtl tr IHtr [//|
-a s1 [/rigth_correct [] -> _ _ _ |[]
-s2 /rigth_correct [] ->]]] //= => [Rs1 /case_leftist_rank_inv_r LI|
-Rs1 /case_leftist_rank_inv_rl /and3P[LI1 LI2 LE]] => SI1 SI2.
-- rewrite -addn1 -[(length s2).+1]addn1 leq_add2r. by apply IHtr.
-rewrite (length_right_spine tr s1) //.
-case: (right_spine_ex tl)=> s /andP [] Rs SIstl.
-suffices: (rank tl <= length s2)%N. ssrnatlia.
-rewrite -(length_right_spine tl s) //.
-by apply: IHtl.
-Qed.
-
 Definition makeT (x : T) h1 h2 :=
-if (rank h2 <= rank h1)%N then Node (rank h2).+1 x h1 h2 else Node (rank h1).+1 x h2 h1.
+let m1 := measure h1 in
+  let m2 := measure h2 in
+      if (m2 <= m1)%N then [h1| f m1 m2, x |h2] else [h2| f m2 m1, x |h1] .
 
 Ltac makeT_cases := match goal with
 | H : (?a <= ?b)%N = _ |- _ => rewrite /makeT; move : H => /= ->
@@ -303,18 +301,17 @@ Lemma makeT_preserves_LI_inv x tl tr :
 leftist_inv tl -> leftist_inv tr ->
 leftist_inv (makeT x tl tr).
 Proof. 
-rewrite /makeT; case H : (rank tr <= rank tl)%N=> /=->->.
+rewrite /makeT; case: ifP=> H /=->->.
 - by rewrite H.
-- suffices: (rank tl <= rank tr)%N => [->|] //; move: H.
+- suffices: (measure tl <= measure tr)%N => [->|] //; move: H.
 move=> /neq0_lt0n; by ssrnatlia.
 Qed.
 
 Lemma makeT_preserves_rk_inv x tl tr :
-rank_rk tl -> rank_rk tr ->
-rank_rk (makeT x tl tr).
+measure_inv tl -> measure_inv tr ->
+measure_inv (makeT x tl tr).
 Proof.
-move=> Rl Rr; rewrite /makeT -!(rank_correct _ Rl) -!(rank_correct _ Rr).
-by case H : (rk tr <= rk tl)%N=> /=; rewrite Rl Rr eq_refl.
+by rewrite /makeT; case: ifP=> /= _ ->->; rewrite measureNode eq_refl. 
 Qed.
 
 Lemma makeT_peserves_HO_inv x tl tr :
@@ -322,17 +319,19 @@ heap_ordered tl -> heap_ordered tr ->
 LE x tl -> LE x tr ->
 heap_ordered (makeT x tl tr).
 Proof.
-by rewrite /makeT; case H : (rank tr <= rank tl)%N=> /=->->->->.
+rewrite /makeT; by case: ifP => _ /=->->->->.
 Qed.
 
 Definition leftistheap h :=
-[&& leftist_inv h, rank_rk h & heap_ordered h].
+[&& leftist_inv h, measure_inv h & heap_ordered h].
 
-Fact leftistheap_NodexEE x : leftistheap [ [|,|]| 1, x | [|,|]].
-Proof. by rewrite /leftistheap rank_rk_NodexEE heap_ordered_NodexEE leftist_inv_NodexEE. Qed.
+Fact leftistheap_NodexEE x : leftistheap [[|,|]| measure1, x | [|,|]].
+Proof. by rewrite /leftistheap measure_inv_NodexEE heap_ordered_NodexEE leftist_inv_NodexEE. Qed.
+Hint Resolve leftistheap_NodexEE : core.
 
-Fact leftistheap_E : leftistheap ( [|,|]).
-Proof. by rewrite /leftistheap rank_rk_E heap_ordered_E leftist_inv_E. Qed.
+Fact leftistheap_E : leftistheap ([|,|]).
+Proof. by rewrite /leftistheap. Qed.
+Hint Resolve leftistheap_E : core.
 
 Fixpoint merge a :=
 if a is Node n x a1 b1 then
@@ -350,18 +349,16 @@ Arguments merge !tl !tr : rename.
 
 Lemma merge_E_h: forall h, merge Emp h = h.
 Proof.  by case. Qed.
-Hint Rewrite merge_E_h.
 
 Lemma merge_h_E: forall h, merge h Emp = h.
 Proof. by case. Qed.
-Hint Rewrite merge_h_E.
 
-Lemma rank_rk_r n x tl tr:
-rank_rk (Node n x tl tr) -> rank_rk tr.
+Lemma measure_inv_r n x tl tr:
+measure_inv (Node n x tl tr) -> measure_inv tr.
 Proof. by move=> /and3P[]. Qed.
 
-Lemma rank_rk_l n x tl tr :
-rank_rk (Node n x tl tr) -> rank_rk tl.
+Lemma measure_inv_l n x tl tr :
+measure_inv (Node n x tl tr) -> measure_inv tl.
 Proof. by move=> /and3P[]. Qed.
 
 Lemma merge_a nl nr x y tll tlr trr trl :
@@ -373,16 +370,14 @@ move=> /= ->.
 by elim: trr.
 Qed.
 
-Lemma merge_preserve_rk_inv : forall h1 h2,
-rank_rk h1 -> rank_rk h2 -> rank_rk (merge h1 h2) .
+Lemma merge_preserve_measure_inv : forall h1 h2,
+measure_inv h1 -> measure_inv h2 -> measure_inv (merge h1 h2) .
 Proof.
 elim=> [//| nl x tll IHhl tlr IHhr].
 elim=> [|nr y trl IH'hl trr IH'hr] //.
-case H : (x <= y)=> H1 H2; merge_cases;
-move: (H1) (H2) => /case_rank_rk /and3P[_ HH1 HH2] /case_rank_rk /and3P[_ HH3 HH4];
-apply: makeT_preserves_rk_inv=> //.
-- by apply: IHhr.
-by apply: IH'hr.
+merge_casesxy x y => /= /and3P[??? /and3P[*]];
+apply: makeT_preserves_rk_inv=> //; 
+[apply: IHhr|apply: IH'hr]=> //=; apply/and3P; by split.
 Qed.
 
 Lemma case_heap_ordered_l n x tl tr :
@@ -402,9 +397,9 @@ LE x h1 -> LE x h2 -> LE x (merge h1 h2).
 Proof.
 elim=> [//| nl x tll IHhl tlr IHhr].
 elim=> [|nr y trl IH'hl trr IH'hr x' /case_LE HH1 /case_LE HH2] //.
-by merge_casesxy x y; 
-[makeT_casesxy (rank (merge tlr (Node nr y trl trr))) (rank tll)|
-  makeT_casesxy (rank (merge (Node nl x tll tlr) trr)) (rank trl)].
+by merge_casesxy x y;
+[makeT_casesxy (measure (merge tlr (Node nr y trl trr))) (measure tll)|
+  makeT_casesxy (measure (merge (Node nl x tll tlr) trr)) (measure trl)].
 Qed.
 
 Lemma merge_preserve_HO_inv : forall h1 h2,
@@ -446,14 +441,14 @@ Proof.
 move=> /and3P[LI1 RR1 HO1] /and3P[LI2 RR2 HO2]; apply/andP; split.
 - by apply: merge_preserve_LI_inv.
 - apply/andP; split.
-- by apply: merge_preserve_rk_inv.
+- by apply: merge_preserve_measure_inv.
 by apply: merge_preserve_HO_inv. 
 Qed.
 
 Lemma makeT_spec h1 h2 x a: 
 count a (makeT x h1 h2) = a x + count a h1 + count a h2.
 Proof.
-by makeT_casesxy (rank h2) (rank h1)=> /=; ssrnatlia.
+by makeT_casesxy (measure h2) (measure h1)=> /=; ssrnatlia.
 Qed.
 
 Lemma makeT_in_spec h1 h2 x y :
@@ -477,33 +472,31 @@ by rewrite !in_count merge_spec !addn_gt0.
 Qed.
 
 Definition insert (x : T) h := 
-merge (Node 1 x Emp Emp) h.
+merge [[|,|]| measure1, x |[|,|]] h.
 
-Lemma rk_E : ((rk Emp).+1 = 1)%N.
-Proof. by []. Qed.    
 
-Lemma insert_preserve_rk_inv : forall h x,
-rank_rk h -> rank_rk (insert x h).
+Lemma insert_preserve_measure_inv : forall h x,
+measure_inv h -> measure_inv (insert x h).
 Proof.
-by move=> h x Rh; apply merge_preserve_rk_inv.
+by move=> h x Rh; apply: merge_preserve_measure_inv.
 Qed.
 
 Lemma insert_preserve_HO_inv : forall h x,
 heap_ordered h -> heap_ordered (insert x h).
 Proof.
-by move=> h x Rh; apply merge_preserve_HO_inv.
+by move=> h x Rh; apply: merge_preserve_HO_inv.
 Qed.
 
 Lemma insert_preserve_LI_inv : forall h x,
 leftist_inv h -> leftist_inv (insert x h).
 Proof.
-by move=> h x Rh; apply merge_preserve_LI_inv.
+by move=> h x Rh; apply: merge_preserve_LI_inv.
 Qed.
 
 Theorem insert_preserve_LH : forall h x,
 leftistheap h -> leftistheap (insert x h).
 Proof.
-by move=> h x Rh; apply merge_preserve_LH.
+by move=> h x Rh; apply: merge_preserve_LH.
 Qed.
 
 Theorem insert_spec h x a : 
@@ -561,44 +554,30 @@ Qed.
 Definition deletemin h :=
 if h is Node _ _ a b then merge a b else Emp.
 
-Lemma rank_rk_eq n x h1 h2 :
-rank_rk (Node n x h1 h2) -> n = (rk h2).+1.
-Proof. by move=> /and3P[/eqP]. Qed.
+Lemma measure_inv_eq n x h1 h2 :
+measure_inv (Node n x h1 h2) -> n = f (measure h1) (measure h2).
+Proof. by move=> /= /and3P[/eqP]; rewrite measureNode. Qed.
 
 Lemma case_LE' x y h1 h2 n :
 LE x (Node n y h1 h2) -> ((x <= y) = true).
 Proof. by move=> /= ->. Qed.
 
-Lemma rk1 : forall m y h1 h2,
-(1 <= rk (Node m y h1 h2))%N.
-Proof. move=> m y h1 h2 /=. ssrnatlia. Qed.
-
-Lemma rank1 : forall m y h1 h2,
-rank_rk (Node m y h1 h2) -> (1 <= rank (Node m y h1 h2))%N.
-Proof. move=> m y h1 h2 /rank_correct <-. by apply rk1. Qed.
-
-Lemma rk0: rk Emp = 0.
-Proof. by []. Qed.
-
-Lemma rank0: rank Emp = 0.
-Proof. by []. Qed.
-
 Lemma case_leftistheap_l n x h1 h2 :
 leftistheap (Node n x h1 h2) -> leftistheap h1.
 Proof.
-by rewrite /leftistheap => /and3P[/case_leftist_inv_l-> /rank_rk_l-> /case_heap_ordered_l /andP[-> _]].
+by rewrite /leftistheap=> /and3P[/case_leftist_inv_l-> /=/and3P[_ -> _] /and4P[]].
 Qed.
 
 Lemma case_leftistheap_r n x h1 h2 :
 leftistheap (Node n x h1 h2) -> leftistheap h2.
 Proof. 
-by rewrite /leftistheap => /and3P[/case_leftist_inv_r-> /rank_rk_r-> /case_heap_ordered_r /andP[-> _]].
+by rewrite /leftistheap=> /and3P[/case_leftist_inv_r-> /=/and3P[_ _ -> /and4P[]]].
 Qed.
 
 Lemma deletemin_preserve_rk_inv : forall h, 
-rank_rk h -> rank_rk (deletemin h).
+measure_inv h -> measure_inv (deletemin h).
 Proof.
-by case=> //=n x h1 h2 H; apply merge_preserve_rk_inv; move: H=> /and3P[].
+by case=> //=n x h1 h2 H; apply merge_preserve_measure_inv; move: H=> /and3P[].
 Qed.
 
 Lemma deletemin_preserve_HO_inv : forall h, 
@@ -638,24 +617,28 @@ Fixpoint insert' (x : T) h :=
 if h is Node n y a b then
 let h' := Node n y a b in 
   if x <= y then
-    Node 1 x h' Emp
+    Node (f (measure h') (measure ([|,|]))) x h' Emp
   else makeT y a (insert' x b)
-else Node 1 x Emp Emp.
+else Node measure1 x Emp Emp.
 
-Theorem insertE x h : rank_rk h -> leftist_inv h -> insert' x h = insert x h.
+Theorem insertE x h : measure_inv h -> leftist_inv h -> insert' x h = insert x h.
 Proof.
 rewrite /insert.
-elim h=> [//|n y h1 IHh1 h2 IHh2 RR]; move : RR (RR)=> /rank1.
-case H : (x <= y); merge_cases. rewrite /makeT => /ltn_geF -> //.
-move=> _ /and3P[nr RR1 RR2] /and3P[LI1 LI2 rr].
-by rewrite IHh2.
+elim h=> [//|n y h1 IHh1 h2 IHh2 MI LI] //.
+merge_casesxy x y=> //; rewrite ?IHh2 //.
+- rewrite /makeT.
+  have: (measure [h1 | n, y | h2] <= measure ([|,|]) = false)%N.
+- by apply/negbTE; rewrite -ltnNge. 
+- by move=>->.
+- by move: MI=> /= /and3P[].
+by move: LI=> /= /and3P[].
 Qed.
 
 Implicit Type hh : seq (option (heap T)).
 
 Fixpoint seq_to_seqheap (st : seq T) :=
 if st is h :: t then
-  cons [[|,|]| 1, h |[|,|]] (seq_to_seqheap t)
+  cons [[|,|]| measure1, h |[|,|]] (seq_to_seqheap t)
 else [::].
 
 Fixpoint count_sseq a hh := 
@@ -743,8 +726,8 @@ Definition invariant := heap T -> bool.
 Variables inv : invariant.
 
 Hypothesis merge_preserve_invariat : forall h1 h2, inv h1 -> inv h2 -> inv (merge h1 h2).
-Hypothesis inv_E : inv ( [|,|]).
-Hypothesis inv_NodexEE : forall x, inv [ [|,|]| 1, x | [|,|]].
+Hypothesis inv_E : inv ([|,|]).
+Hypothesis inv_NodexEE : forall x, inv [ [|,|]| measure1, x | [|,|]].
 Hint Resolve inv_E : core.
 
 Definition some_inv sh := if sh is some h then inv h else true.
@@ -788,111 +771,107 @@ by rewrite /fromseq /= inv_fromseqheap // all_inv_seq_toseqheap.
 Qed.
 End Invariant.
 
-Print inv_fromseq.
-Definition rank_rk_fromseq : forall s, rank_rk (fromseq s) := 
-  inv_fromseq rank_rk merge_preserve_rk_inv rank_rk_E rank_rk_NodexEE.
+Lemma measure_inv_E : measure_inv ([|,|]).
+Proof. by []. Qed.
+
+
+Definition rank_rk_fromseq : forall s, measure_inv (fromseq s) := 
+  inv_fromseq measure_inv merge_preserve_measure_inv measure_inv_E measure_inv_NodexEE.
 
 Definition heap_ordered_fromseq : forall s, heap_ordered (fromseq s) := 
-  inv_fromseq heap_ordered merge_preserve_HO_inv heap_ordered_E heap_ordered_NodexEE.
+  inv_fromseq heap_ordered merge_preserve_HO_inv heap_ordered_E (heap_ordered_NodexEE measure1).
 
 Definition leftist_inv_fromseq : forall s, leftist_inv (fromseq s) := 
-  inv_fromseq leftist_inv merge_preserve_LI_inv leftist_inv_E leftist_inv_NodexEE.
+  inv_fromseq leftist_inv merge_preserve_LI_inv leftist_inv_E (leftist_inv_NodexEE measure1).
 
 Definition leftistheap_fromseq : forall s, leftistheap (fromseq s) := 
   inv_fromseq leftistheap merge_preserve_LH leftistheap_E leftistheap_NodexEE.
+End Measure.
 
+Fixpoint rank h : nat := if h is Node _ _ _ b then (rank b).+1 else O.
+
+Definition f1 (x y : nat) := y.+1.
+
+Lemma rank__NodexEE : f1 (rank ([|,|])) (rank ([|,|])) = 1%N.
+Proof. by []. Qed.
+
+Lemma rankNode : forall tl tr n x, rank [tl| x, n |tr] = f1 (rank tl) (rank tr).
+Proof. by []. Qed.
+
+Lemma rank_Node_E : forall h1 h2 n x, (rank ([|,|]) < rank [h1 | n, x | h2])%N.
+Proof. by []. Qed.
+
+Definition rank_measureMixin : Measure.mixin_of rank := Measure.Mixin T rank 1%N f1 rankNode rank__NodexEE rank_Node_E.
+Canonical rank_measureType : measureType T := Measure.Pack T rank rank_measureMixin.
+
+Fixpoint size h : nat :=
+if h is Node _ _ a b then (size a) + (size b) + 1 else O.
+
+Definition f2 (x y : nat) := x + y + 1.
+
+Lemma sizeNode : forall tl tr n x, size [tl| x, n |tr] = f2 (size tl) (size tr).
+Proof. by []. Qed.
+Lemma size__NodexEE : f2 (size ([|,|])) (size ([|,|])) = 1%N.
+Proof. by []. Qed.
+Lemma size_Node_E : forall h1 h2 n x, (size ([|,|]) < size [h1 | n, x | h2])%N.
+Proof. move=> /= h1 h2 n x. rewrite addn_gt0; apply/orP; by right. Qed.
+
+Definition size_measureMixin : Measure.mixin_of size := Measure.Mixin T size 1%N f2 sizeNode size__NodexEE size_Node_E.
+Canonical size_measureType : measureType T := Measure.Pack T size size_measureMixin.
+
+Definition leftist_rank_inv := (leftist_measure_inv rank_measureType).
+Definition case_leftist_rank_inv := (case_leftist_measure_inv rank_measureType).
+Definition case_leftist_rank_inv_r := (case_leftist_measure_inv_r rank_measureType).
+Definition case_leftist_rank_inv_rl := (case_leftist_measure_inv_rl rank_measureType).
+
+Lemma rank_correct x n tl tr : measure_inv rank_measureType [tl| n, x |tr] -> n == (rank tr).+1.
+Proof. by move=> /= /and3P[]. Qed.
+
+Section Grank.
+
+(** The (general) rank of a tree is the length of the shortest path from the root to leaves *)
+Fixpoint grank h : nat :=
+  if h is Node _ _ tl tr then
+    (minn (grank tl) (grank tr)).+1
+  else 0.
+
+Theorem grank_rk h : leftist_rank_inv  h -> grank h = rank h.
+Proof.
+elim: h=> // n x h1 IHh1 h2 IHh2
+          /case_leftist_rank_inv/andP[]. rewrite /f /= /f1=>_ /and3P[L1 L2].
+rewrite IHh1 // IHh2 //. by rewrite minnC ?Order.NatOrder.minnE=> ->.
+Qed.
+
+End Grank.
+
+Section Spine.
+
+Lemma length_right_spine : forall h s, 
+leftist_rank_inv h -> Right s -> spine_in s h -> length s = rank h.
+Proof.
+move=> h s /andP [] _ RC.
+elim: h s RC=> 
+[[|[]]|n x tl IHhl tr IHtr [_ _|[s /= /and3P[_ RRl RRr] |]]] //= R S.
+apply/eqnP=> /=. apply/eqP. by apply: IHtr.
+Qed.
+
+Theorem rigth_spine_shortest : 
+forall H s1 s2, Right s1 -> leftist_rank_inv H -> spine_in s1 H -> spine_in s2 H ->
+(length s1 <= length s2)%nat.
+Proof. 
+elim=>
+[s1 s2 _ _ /spine_in_E->|
+n x tl IHtl tr IHtr [//|
+a s1 [ _ _ _ |[]
+s2 /rigth_correct [] ->]]] //= => [Rs1 /case_leftist_rank_inv_r LI|
+Rs1 /case_leftist_rank_inv_rl /and3P[LI1 LI2 LE]] => SI1 SI2.
+- rewrite -addn1 -[(length s2).+1]addn1 leq_add2r. by apply IHtr.
+rewrite (length_right_spine tr s1) //.
+case: (right_spine_ex tl)=> s /andP [] Rs SIstl.
+suffices: (rank tl <= length s2)%N. move: LE=> /=; ssrnatlia.
+rewrite -(length_right_spine tl s) //.
+apply: IHtl=> //.
+Qed.
+End Spine.
 End Specifications.
 End leftistheap.
-Module WBleftistheap.
-(*Weight-biased leftist heaps are an al-
-ternative to leftist heaps that replace the leftist property with the weight-biased
-leftist property: the size of any left child is at least as large as the size of its
-right sibling.*)
-Section WBLeftistDef.
-Variables (T: ordType).
-
-Inductive heap :=
-| Emp : heap
-| Node : nat -> T-> heap -> heap -> heap.
- 
-Fixpoint rank (H : heap) : nat :=
-if H is Node r _ _ _ then r else O.
-
-Definition makeT (x : T) (a b : heap) : heap :=
-if rank a >= rank b then 
-Node ((rank b) + (rank a) + 1) x a b
-else Node ((rank b) + (rank a) + 1) x b a.
-
-Fixpoint size (h : heap) : nat :=
-if h is Node _ _ a b then (size b) + (size a) + 1 else O.
-
-Definition isEmpty (h : heap) :=
-if h is Emp then true else false.
-
-
-(*Program Fixpoint merge (a b : heap) {measure (size a + size b)} : heap :=
-match a, b with
-| h, Emp => h
-| Emp, h => h
-| Node n x a1 b1, Node m y a2 b2 =>
-let h1 := Node n x a1 b1 in
-let h2 := Node m y a2 b2 in
-if leq x y then
-  makeT x a1 (merge b1 h2)
-else
-  makeT y a2 (merge h1 b2)
-end.
-Solve All Obligations with (move=> /=; rewrite -!plusE; lia).
-Next Obligation.
-move=> /=;
-rewrite -!plusE; lia.
-Qed.
-Next Obligation.
-move=> /=;
-rewrite -!plusE; lia.
-Qed.
-
-Definition insert (x : T) (h : heap) := 
-        merge (Node 1 x Emp Emp) h.
-
-Definition findmin (h : heap) := 
-if h is Node _ x _ _ then Some x else None.
-
-Definition deletemin (h : heap) :=
-if h is Node _ _ a b then merge a b else Emp.
-
-Program Fixpoint merge' (a b : heap) {measure (size a + size b)} : heap :=
-match a, b with
-| h, Emp => h
-| Emp, h => h
-| Node w1 x a1 b1, Node w2 y a2 b2 =>
-let h1 := Node w1 x a1 b1 in
-let h2 := Node w2 y a2 b2 in
-if leq x y then
-  if size a1 >= (size b1) + w2 then 
-    Node (w1 + w2) x a1 (merge' b1 h2)
-  else Node (w1 + w2) x (merge' b1 h2) a1
-else
-  if size a2 >= w1 + size b2 then
-    Node (w1 + w2) y a2 (merge' h1 b2)
-  else Node (w1 + w2) y (merge' h1 b2) a2
-end.
-Next Obligation.
-move=> /=;
-rewrite -!plusE; lia.
-Qed.
-Next Obligation.
-move=> /=;
-rewrite -!plusE; lia.
-Qed.
-Next Obligation.
-move=> /=;
-rewrite -!plusE; lia.
-Qed.
-Next Obligation.
-move=> /=;
-rewrite -!plusE; lia.
-Qed.*)
-
-End WBLeftistDef.
-End WBleftistheap.
