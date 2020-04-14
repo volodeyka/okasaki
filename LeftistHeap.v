@@ -4,6 +4,7 @@ Require Import Psatz.
 Import Order.TTheory.
 Notation ordType := (orderType tt).
 Import Order.NatOrder.
+From Equations Require Import Equations.
 
 Open Scope order_scope.
 
@@ -17,7 +18,6 @@ Proof.
 by case: a; case b.
 Qed.
 Hint Resolve trd_true snd_true lexx : core.
-
 
 Module leftistheap.
 (*Leftist heaps are heap-ordered binary trees that satisfy the
@@ -37,7 +37,7 @@ End LeftistDef.
 Arguments Node {T}.
 Arguments Emp {T}.
 Notation "[ tl | n , x | tr ]" := (Node n x tl tr) (at level 0).
-Notation "'[|,|]'" := Emp (at level 200).
+Notation "'[||]'" := Emp.
 
 Module Measure.
 Structure mixin_of {T : ordType} (measure : heap T -> nat) :=
@@ -45,8 +45,8 @@ Structure mixin_of {T : ordType} (measure : heap T -> nat) :=
     measure1            : nat;
     f                   : nat -> nat -> nat;
     measureNode         : forall tl tr n x, measure [tl| x, n |tr] = f (measure tl) (measure tr);
-    measure_NodexEE     : f (measure ([|,|])) (measure ([|,|])) = measure1;
-    measure_Node_E      : forall h1 h2 n x, (measure ([|,|]) < measure [h1 | n, x | h2])%N
+    measure_NodexEE     : f (measure [||]) (measure [||]) = measure1;
+    measure_Node_E      : forall h1 h2 n x, (measure [||] < measure [h1 | n, x | h2])%N
   }.
 
 Notation class_of := mixin_of (only parsing).
@@ -102,7 +102,7 @@ Lemma eqheap_Node (x1 x2 : T) n1 n2 tr1 tr2 tl1 tl2 :
   ([tl1 | n1, x1 | tr1] == [tl2 | n2, x2 | tr2]) = [&& (n1 == n2), (x1 == x2), eqheap tl1 tl2 & eqheap tr1 tr2].
 Proof. by []. Qed.
 
-Lemma eqNode1xEE x y: ([[|,|]| 1, x |[|,|]] == [[|,|] | 1, y |[|,|]]) = (x == y).
+Lemma eqNode1xEE x y: ([ [||]| 1, x | [||]] == [ [||] | 1, y | [||]]) = (x == y).
 Proof.
 by rewrite eqheap_Node !eq_refl; case (x == y).
 Qed.
@@ -121,7 +121,7 @@ Canonical mem_seq_predType := PredType mem_heap.
 Lemma in_Node x y n tl tr: 
   x \in [tl | n, y | tr] = [|| x == y, x \in tl | x \in tr].
 Proof. by []. Qed.
-
+(* Definition of count and simple properties *)
 Section Conut.
 Variables a : pred T.
 
@@ -131,19 +131,56 @@ Fixpoint count h : nat := if h is [tl| _, x |tr] then a x + count
 Lemma count_Node tl tr y n: count [tl| n, y |tr] = a y + count tl + count tr.
 Proof. by []. Qed.
 
-Lemma count_E : count ([|,|]) = 0.
+Lemma count_E : count [||] = 0.
 Proof. by []. Qed.
 
-Lemma count_NodexEE n y : count [[|,|]| n, y |[|,|]] = a y.
+Lemma count_NodexEE n y : count [ [||]| n, y | [||]] = a y.
 Proof. move=> /=. by rewrite !addn0. Qed.
 
 Let countE := (count_Node, count_E, count_NodexEE).
+
 End Conut.
 
 Lemma in_count x h: x \in h = (0 < count (xpred1 x) h)%N.
 Proof.
 elim h=> // n y h1 IHh1 h2 IHh2; rewrite in_Node /= !addn_gt0 IHh1 IHh2 eq_sym; by case: (y == x).
 Qed.
+
+(* Definition of rank and size and simple properties *)
+Section Mesures.
+
+Fixpoint rank h : nat := if h is Node _ _ _ b then (rank b).+1 else O.
+
+Definition f1 (x y : nat) := y.+1.
+
+Lemma rank__NodexEE : f1 (rank [||]) (rank  [||]) = 1%N.
+Proof. by []. Qed.
+
+Lemma rankNode : forall tl tr n x, rank [tl| x, n |tr] = f1 (rank tl) (rank tr).
+Proof. by []. Qed.
+
+Lemma rank_Node_E : forall h1 h2 n x, (rank  [||] < rank [h1 | n, x | h2])%N.
+Proof. by []. Qed.
+
+Fixpoint size h : nat :=
+if h is Node _ _ a b then (size a) + (size b) + 1 else O.
+
+Definition f2 (x y : nat) := x + y + 1.
+
+Lemma sizeNode : forall tl tr n x, size [tl| x, n |tr] = f2 (size tl) (size tr).
+Proof. by []. Qed.
+
+Lemma size__NodexEE : f2 (size  [||]) (size  [||]) = 1%N.
+Proof. by []. Qed.
+
+Lemma size_Node_E : forall h1 h2 n x, (size  [||] < size [h1 | n, x | h2])%N.
+Proof. move=> /= h1 h2 n x. rewrite addn_gt0; apply/orP; by right. Qed.
+
+
+Lemma size_conut h : size =1 count xpredT.
+Proof. by elim=> //= n x h1 -> h2->; ssrnatlia. Qed.
+
+End Mesures.
 
 
 Definition empty h :=
@@ -167,10 +204,10 @@ Hint Resolve measure_Node_E : core.
 Fixpoint measure_inv h : bool :=
 match h with
 | [tl| n, x |tr] => [&& (n == measure h), (measure_inv tl) & (measure_inv tr)]
-| [|,|]            => true
+|  [||]            => true
 end.
 
-Lemma measure_inv_NodexEE x : measure_inv [[|,|]| measure1, x |[|,|]].
+Lemma measure_inv_NodexEE x : measure_inv [ [||]| measure1, x | [||]].
 Proof.
   move=> /=. by rewrite measureNode measure_NodexEE eq_refl.
 Qed.
@@ -181,23 +218,34 @@ if h is Node n x tl tr then
   [&& (LE x tl), (LE x tr), (heap_ordered tl) & (heap_ordered tr)]
 else true.
 
-Fact heap_ordered_NodexEE n x : heap_ordered [[|,|]| n, x | [|,|]].
+Lemma LE_trans y x h: LE y h -> (x <= y) -> LE x h.
+Proof. by case: h=> //= _ s _ _ H /le_trans/(_ H). Qed.
+
+
+Lemma LE_spec x h : heap_ordered h -> LE x h -> (count (>= x) h = count predT h).
+Proof.
+by elim h=> // n y h1 IHh1 h2 IHh2 /= /and4P[???? XY];
+rewrite XY IHh1 // ?IHh2 // ?(LE_trans y).
+Qed.
+
+
+Fact heap_ordered_NodexEE n x : heap_ordered [ [||]| n, x |  [||]].
 Proof. by []. Qed.
 Hint Resolve heap_ordered_NodexEE: core.
-Fact heap_ordered_E : heap_ordered ([|,|]). Proof. by []. Qed.
+Fact heap_ordered_E : heap_ordered [||]. Proof. by []. Qed.
 
-Fact measure_E : measure_inv ([|,|]). Proof. by []. Qed.
+Fact measure_E : measure_inv [||]. Proof. by []. Qed.
 
 Fixpoint leftist_inv h : bool :=
 if h is Node n x tl tr then
   [&& (measure tr <= measure tl)%N, (leftist_inv tl) & (leftist_inv tr)]
 else true.
 
-Fact leftist_inv_NodexEE n x : leftist_inv [[|,|]| n, x | [|,|]].
+Fact leftist_inv_NodexEE n x : leftist_inv [[||]| n, x |  [||]].
 Proof. move=> /=; by rewrite leqnn. Qed.
 Hint Resolve leftist_inv_NodexEE : core.
 
-Fact leftist_inv_E : leftist_inv ([|,|]). Proof. by []. Qed.
+Fact leftist_inv_E : leftist_inv [||]. Proof. by []. Qed.
 
 Variant side := r | l.
 
@@ -325,11 +373,11 @@ Qed.
 Definition leftistheap h :=
 [&& leftist_inv h, measure_inv h & heap_ordered h].
 
-Fact leftistheap_NodexEE x : leftistheap [[|,|]| measure1, x | [|,|]].
+Fact leftistheap_NodexEE x : leftistheap [ [||]| measure1, x |  [||]].
 Proof. by rewrite /leftistheap measure_inv_NodexEE heap_ordered_NodexEE leftist_inv_NodexEE. Qed.
 Hint Resolve leftistheap_NodexEE : core.
 
-Fact leftistheap_E : leftistheap ([|,|]).
+Fact leftistheap_E : leftistheap  [||].
 Proof. by rewrite /leftistheap. Qed.
 Hint Resolve leftistheap_E : core.
 
@@ -462,8 +510,12 @@ Theorem merge_spec h1 h2 a:
 Proof.
 elim: h1 h2=> [h2|n x h1 IHh1 h2 IHh2]; rewrite ?merge_E_h //.
 elim=> [/=|m y h21 IHh21 h22 IHh22]; first by ssrnatlia.
-- by merge_casesxy x y; rewrite makeT_spec; rewrite ?(IHh2, IHh22) /=; ssrnatlia.
+- by merge_casesxy x y; rewrite makeT_spec; rewrite ?IHh2 ?IHh22 /=; ssrnatlia.
 Qed.
+
+Lemma merge_size h1 h2 : size (merge h1 h2) = size h1 + size h2.
+Proof. by rewrite !size_conut ?merge_spec. Qed.
+
 
 Theorem merge_in_spec  h1 h2 x :
 x \in (merge h1 h2) = ((x \in h1) || (x \in h2)).
@@ -472,7 +524,7 @@ by rewrite !in_count merge_spec !addn_gt0.
 Qed.
 
 Definition insert (x : T) h := 
-merge [[|,|]| measure1, x |[|,|]] h.
+merge [[||]| measure1, x | [||]] h.
 
 
 Lemma insert_preserve_measure_inv : forall h x,
@@ -501,9 +553,11 @@ Qed.
 
 Theorem insert_spec h x a : 
   count a (insert x h) = a x + count a h.
-Proof.
-by rewrite merge_spec /=; ssrnatlia.
-Qed.
+Proof. by rewrite merge_spec /=; ssrnatlia. Qed.
+
+Lemma insert_size h x: size (insert x h) = (size h).+1.
+Proof. by rewrite !size_conut ?merge_spec. Qed.
+
 
 Theorem insert_in_spec h x y :
 x \in (insert y h) = ((x == y) || (x \in h)).
@@ -606,6 +660,10 @@ Proof.
 by case: h=> // n y h1 h2 /= [->] a; rewrite insert_spec merge_spec addnA.
 Qed.
 
+Lemma deletemin_size h : size (deletemin h) = (size h).-1.
+Proof. case: h=> // n x tl tr; by rewrite ?size_conut //= merge_spec. Qed.
+
+
 Theorem deletemin_in_spec : forall h x y,
 Some x = findmin h -> (y \in (insert x (deletemin h))) = (y \in h).
 Proof.
@@ -617,7 +675,7 @@ Fixpoint insert' (x : T) h :=
 if h is Node n y a b then
 let h' := Node n y a b in 
   if x <= y then
-    Node (f (measure h') (measure ([|,|]))) x h' Emp
+    Node (f (measure h') (measure [||])) x h' Emp
   else makeT y a (insert' x b)
 else Node measure1 x Emp Emp.
 
@@ -627,7 +685,7 @@ rewrite /insert.
 elim h=> [//|n y h1 IHh1 h2 IHh2 MI LI] //.
 merge_casesxy x y=> //; rewrite ?IHh2 //.
 - rewrite /makeT.
-  have: (measure [h1 | n, y | h2] <= measure ([|,|]) = false)%N.
+  have: (measure [h1 | n, y | h2] <= measure [||] = false)%N.
 - by apply/negbTE; rewrite -ltnNge. 
 - by move=>->.
 - by move: MI=> /= /and3P[].
@@ -638,7 +696,7 @@ Implicit Type hh : seq (option (heap T)).
 
 Fixpoint seq_to_seqheap (st : seq T) :=
 if st is h :: t then
-  cons [[|,|]| measure1, h |[|,|]] (seq_to_seqheap t)
+  cons [ [||]| measure1, h | [||]] (seq_to_seqheap t)
 else [::].
 
 Fixpoint count_sseq a hh := 
@@ -663,7 +721,7 @@ Fixpoint fromseqheap_push h1 hh :=
 
 Fixpoint fromseqheap_pop h1 hh :=
   if hh is sh2 :: hh' then
-    let h2 := if sh2 is some h then h else  [|,|] in
+    let h2 := if sh2 is some h then h else   [||] in
    fromseqheap_pop (merge h2 h1) hh' else h1.
 
 Fixpoint fromseqheap_rec hh sh  :=
@@ -671,18 +729,18 @@ Fixpoint fromseqheap_rec hh sh  :=
   | [:: x1, x2 & h'] => let h1 := merge x1 x2 in
     fromseqheap_rec (fromseqheap_push h1 hh) h'
   | [:: h] => fromseqheap_pop h hh
-  | [::] => fromseqheap_pop ( [|,|]) hh
+  | [::] => fromseqheap_pop (  [||]) hh
   end.
 
 Definition fromseqheap := (fromseqheap_rec [::]).
 
 Fixpoint fromseqheap_rec1 hh sh :=
-  if sh is x :: h then fromseqheap_rec1 (fromseqheap_push x hh) h else fromseqheap_pop ( [|,|]) hh.
+  if sh is x :: h then fromseqheap_rec1 (fromseqheap_push x hh) h else fromseqheap_pop (  [||]) hh.
 
 Lemma fromseqheapE sh : fromseqheap sh = fromseqheap_rec1 [::] sh.
 Proof.
 transitivity (fromseqheap_rec1 [:: None] sh); last by case: sh.
-rewrite /fromseqheap; move: [::] {2}_.+1 (ltnSn (size sh)./2) => hh n.
+rewrite /fromseqheap; move: [::] {2}_.+1 (ltnSn (seq.size sh)./2) => hh n.
 elim: n => // n IHn in hh sh *. case: sh => [|x [|y s]] //=; by rewrite ?merge_h_E=> //= /IHn->.
 Qed.
 
@@ -726,8 +784,8 @@ Definition invariant := heap T -> bool.
 Variables inv : invariant.
 
 Hypothesis merge_preserve_invariat : forall h1 h2, inv h1 -> inv h2 -> inv (merge h1 h2).
-Hypothesis inv_E : inv ([|,|]).
-Hypothesis inv_NodexEE : forall x, inv [ [|,|]| measure1, x | [|,|]].
+Hypothesis inv_E : inv [||].
+Hypothesis inv_NodexEE : forall x, inv [[||]| measure1, x |  [||]].
 Hint Resolve inv_E : core.
 
 Definition some_inv sh := if sh is some h then inv h else true.
@@ -771,7 +829,7 @@ by rewrite /fromseq /= inv_fromseqheap // all_inv_seq_toseqheap.
 Qed.
 End Invariant.
 
-Lemma measure_inv_E : measure_inv ([|,|]).
+Lemma measure_inv_E : measure_inv [||].
 Proof. by []. Qed.
 
 
@@ -786,35 +844,48 @@ Definition leftist_inv_fromseq : forall s, leftist_inv (fromseq s) :=
 
 Definition leftistheap_fromseq : forall s, leftistheap (fromseq s) := 
   inv_fromseq leftistheap merge_preserve_LH leftistheap_E leftistheap_NodexEE.
+
+
+Equations fromheap h : seq T by wf (size h) lt:=
+fromheap [||] := [::];
+fromheap [tl| n, x |tr] := x :: (fromheap (deletemin [tl| n, x |tr])).
+
+Next Obligation. rewrite merge_size; ssrnatlia. Qed.
+
+Lemma fromheap_spec1 h: count^~ h =1 seq.count^~ (fromheap h).
+Proof.
+move=> p. apply_funelim (fromheap h)=> // ???? /= <-.
+by rewrite merge_spec; ssrnatlia.
+Qed.
+
+Lemma fromheap_srec1_in x h: (x \in h) = (x \in (fromheap h)).
+Proof. by rewrite !in_count -has_pred1 has_count -fromheap_spec1. Qed.
+
+Search _ seq.size seq.count.
+
+Lemma fromheap_spec2 h: (heap_ordered h) -> sorted <=%O (fromheap h).
+Proof.
+apply_funelim (fromheap h)=> //= _ x h1 h2 IHh /and4P[*];
+  rewrite path_sortedE ?IHh ?all_count -?count_predT -?fromheap_spec1 ?merge_spec ?LE_spec ?eq_refl //.
+- by apply: merge_preserve_HO_inv.
+by exact le_trans.
+Qed.
+
+Definition heapsort s := fromheap (fromseq s).
+
+Theorem sorted_heapsort s : (sorted <=%O (heapsort s)).
+Proof. by rewrite fromheap_spec2 // heap_ordered_fromseq. Qed.
+
+Lemma count_heapsort s : seq.count^~ (heapsort s) =1 seq.count^~ s.
+Proof. move=> p. by rewrite /heapsort -fromheap_spec1 fromseq_cspec. Qed.
+
+Theorem perm_heapsort s : perm_eql (heapsort s) s.
+Proof. apply/permPl/permP; by apply: count_heapsort. Qed.
+
 End Measure.
-
-Fixpoint rank h : nat := if h is Node _ _ _ b then (rank b).+1 else O.
-
-Definition f1 (x y : nat) := y.+1.
-
-Lemma rank__NodexEE : f1 (rank ([|,|])) (rank ([|,|])) = 1%N.
-Proof. by []. Qed.
-
-Lemma rankNode : forall tl tr n x, rank [tl| x, n |tr] = f1 (rank tl) (rank tr).
-Proof. by []. Qed.
-
-Lemma rank_Node_E : forall h1 h2 n x, (rank ([|,|]) < rank [h1 | n, x | h2])%N.
-Proof. by []. Qed.
 
 Definition rank_measureMixin : Measure.mixin_of rank := Measure.Mixin T rank 1%N f1 rankNode rank__NodexEE rank_Node_E.
 Canonical rank_measureType : measureType T := Measure.Pack T rank rank_measureMixin.
-
-Fixpoint size h : nat :=
-if h is Node _ _ a b then (size a) + (size b) + 1 else O.
-
-Definition f2 (x y : nat) := x + y + 1.
-
-Lemma sizeNode : forall tl tr n x, size [tl| x, n |tr] = f2 (size tl) (size tr).
-Proof. by []. Qed.
-Lemma size__NodexEE : f2 (size ([|,|])) (size ([|,|])) = 1%N.
-Proof. by []. Qed.
-Lemma size_Node_E : forall h1 h2 n x, (size ([|,|]) < size [h1 | n, x | h2])%N.
-Proof. move=> /= h1 h2 n x. rewrite addn_gt0; apply/orP; by right. Qed.
 
 Definition size_measureMixin : Measure.mixin_of size := Measure.Mixin T size 1%N f2 sizeNode size__NodexEE size_Node_E.
 Canonical size_measureType : measureType T := Measure.Pack T size size_measureMixin.
