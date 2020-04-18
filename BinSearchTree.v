@@ -262,5 +262,32 @@ rewrite is_right //=. by move=> Mxr; rewrite (IHr BSr Mxr).
 by apply/and4P.
 Qed.
 
+Fixpoint insert_aux (x : Elem) (Tr : Tree) : option Tree :=
+if Tr is T l y r then
+  if x < y then
+    if insert_aux x l is Some l' then
+      Some (T l' y r)
+    else
+      None
+  else if x > y then
+    if insert_aux x r is Some r' then
+      Some (T l y r')
+    else
+      None
+  else
+    Some (T l y r)
+else
+  Some (T E x E).
+
+Definition insert' (x : Elem) (Tr : Tree) : Tree :=
+  if insert_aux x Tr is Some t then t else E.
+
+Lemma insertE (x : Elem) (Tr : Tree) : insert x Tr = insert' x Tr.
+Proof.
+have: Some (insert x Tr) = insert_aux x Tr.
+- elim: Tr=> //= l IHl y r IHr. case: ltgtP=> xy //; first by rewrite -IHl. by rewrite -IHr.
+move=> H. rewrite/insert'. by rewrite -H.
+Qed.
+
 End BinSearchTree.
 End BST.
