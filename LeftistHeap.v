@@ -203,8 +203,7 @@ Qed.
 
 Lemma in_count x h: x \in h = (0 < count (xpred1 x) h)%N.
 Proof.
-elim h=> // n y h1 IHh1 h2 IHh2;
-by rewrite in_node /= !addn_gt0 IHh1 IHh2 eq_sym lt0b orbA.
+elim h=> // ??? IHh1 ? IHh2; by rewrite in_node /= !addn_gt0 IHh1 IHh2 eq_sym lt0b orbA.
 Qed.
 
 (* if h is heap oredered (see below) LE x h is same as   *)
@@ -221,15 +220,13 @@ if h is Node n x tl tr then
   [&& (LE x tl), (LE x tr), (heap_ordered tl) & (heap_ordered tr)]
 else true.
 
-Lemma LE_correct h x y:
-heap_ordered h -> x \in h -> LE y h -> y <= x.
+Lemma LE_correct h x y: heap_ordered h -> x \in h -> LE y h -> y <= x.
 Proof.
 by elim: h x y=> [| n x h1 IHh1 h2 IHh2 x' y' /= /and4P[L1 L2 H1 H2]] //
 /or3P[/eqP ->|/(IHh1 _ _ H1)/(_ L1)|/(IHh2 _ _ H2)/(_ L2)] // H /le_trans/(_ H).
 Qed.
 
-Lemma LE_spec x h : heap_ordered h ->
-  LE x h -> all (>= x) h.
+Lemma LE_spec x h : heap_ordered h -> LE x h -> all (>= x) h.
 Proof.
 elim h=> // n y h1 IHh1 h2 IHh2 /= /and4P[???? XY].
 by rewrite XY IHh1 // ?IHh2 // ?(LE_trans y).
@@ -347,8 +344,7 @@ let m1 := measure h1 in
   let m2 := measure h2 in
       if (m2 <= m1)%N then [h1| f m1 m2, x |h2] else [h2| f m2 m1, x |h1] .
 
-Lemma makeT_LI_inv x tl tr :
-leftist_inv tl -> leftist_inv tr ->
+Lemma makeT_LI_inv x tl tr : leftist_inv tl -> leftist_inv tr ->
 leftist_inv (makeT x tl tr).
 Proof. 
 rewrite /makeT; case: ifP=> H /=->->; first by rewrite H.
@@ -356,26 +352,22 @@ rewrite /makeT; case: ifP=> H /=->->; first by rewrite H.
 move=> /neq0_lt0n; by ssrnatlia.
 Qed.
 
-Lemma makeT_rk_inv x tl tr :
-measure_inv tl -> measure_inv tr ->
+Lemma makeT_rk_inv x tl tr : measure_inv tl -> measure_inv tr ->
 measure_inv (makeT x tl tr).
 Proof.
 by rewrite /makeT; case: ifP=> /= _ ->->; rewrite measureNode eq_refl. 
 Qed.
 
 Lemma makeT_peserve_HO_inv x tl tr :
-heap_ordered tl -> heap_ordered tr ->
-LE x tl -> LE x tr ->
-heap_ordered (makeT x tl tr).
+heap_ordered tl -> heap_ordered tr -> LE x tl -> LE x tr ->
+ heap_ordered (makeT x tl tr).
 Proof.
 rewrite /makeT; by case: ifP => _ /=->->->->.
 Qed.
 
-Lemma makeT_spec h1 h2 x a: 
+Lemma makeT_spec h1 h2 x a:
 count a (makeT x h1 h2) = a x + count a h1 + count a h2.
-Proof.
-rewrite /makeT; case: ifP=> /=; ssrnatlia.
-Qed.
+Proof. rewrite /makeT; case: ifP=> /=; ssrnatlia. Qed.
 
 Lemma makeT_in_spec h1 h2 x y :
 x \in (makeT y h1 h2) = ((x == y) || (x \in h1) || (x \in h2)).
@@ -408,14 +400,14 @@ end.
 
 Ltac merge_casesxy x y := case H : (x <= y); merge_cases.
 
+
 Lemma merge_E_h h: merge Emp h = h.
 Proof. by []. Qed.
 
 Lemma merge_h_E h: merge h Emp = h.
 Proof. by case: h. Qed.
 
-Lemma merge_a nl nr x y tll tlr trr trl :
-(x <= y) = false -> 
+Lemma merge_a nl nr x y tll tlr trr trl : (x <= y) = false -> 
 merge (Node nl x tll tlr) (Node nr y trl trr) = 
 makeT y trl (merge  (Node nl x tll tlr) trr).
 Proof. rewrite /merge /= => ->. by elim: trr. Qed.
@@ -423,16 +415,14 @@ Proof. rewrite /merge /= => ->. by elim: trr. Qed.
 Lemma merge_measure_inv h1 h2:
 measure_inv h1 -> measure_inv h2 -> measure_inv (merge h1 h2) .
 Proof.
-elim: h1 h2=> // ? x ??? IHhr. elim=> // ? y ??? IH'hr.
-merge_casesxy x y => /= /and3P[??? /and3P[*]]; 
-apply: makeT_rk_inv=> //; 
-[apply: IHhr|apply: IH'hr]=> //=; apply/and3P; by split.
+elim: h1 h2=> // ? x ??? IHhr. elim=> // ? y ??? IH'hr;
+merge_casesxy x y => /and3P[E M M' /and3P[EQ M1 M2]];
+by rewrite makeT_rk_inv // (IHhr, IH'hr) //= (EQ, E) (M1, M) (M2, M').
 Qed.
 
-Lemma merge_LE h1 h2 x:
-LE x h1 -> LE x h2 -> LE x (merge h1 h2).
+Lemma merge_LE h1 h2 x: LE x h1 -> LE x h2 -> LE x (merge h1 h2).
 Proof.
-elim: h1 h2 x => // ? x ????. elim=> // ? y * /=.
+elim: h1 h2 x => // ? x ????. elim=> // ? y *. 
 by merge_casesxy x y; rewrite /makeT; case: ifP.
 Qed.
 
@@ -440,48 +430,39 @@ Lemma merge_HO_inv h1 h2:
 heap_ordered h1 -> heap_ordered h2 -> heap_ordered (merge h1 h2).
 Proof.
 elim: h1 h2=> // ? x ??? IHhr. elim=> // ? y ??? IH'hr H1 H2.
-move : (H1) (H2)=> /= /and4P[???? /= /and4P[????] //].
-merge_casesxy x y; apply makeT_peserve_HO_inv=> //;
-[apply: IHhr | | apply: IH'hr |]=> //; apply: merge_LE=> //=.
-move: (negbT H). by rewrite -ltNge lt_def=> /andP[_ ->].
+move : (H1) (H2)=> /and4P[???? /and4P[????]]. by merge_casesxy x y;
+rewrite makeT_peserve_HO_inv ?IHhr ?IH'hr ?merge_LE //=; move: H; case: ltgtP.
 Qed.
 
 Lemma merge_LI_inv h1 h2:
-leftist_inv h1 -> leftist_inv h2 -> leftist_inv (merge h1 h2).
+ leftist_inv h1 -> leftist_inv h2 -> leftist_inv (merge h1 h2).
 Proof.
 elim: h1 h2=> // ? x ??? IHhr. elim=> // ? y ??? IH'hr H1 H2.
-move : (H1) (H2) => /and3P[??? /and3P[*]].
-merge_casesxy x y; apply: makeT_LI_inv=> //;
-by [apply: IHhr | apply: IH'hr].
+move : (H1) (H2) => /and3P[??? /and3P[*]]. merge_casesxy x y; 
+by rewrite makeT_LI_inv ?IHhr ?IH'hr.
 Qed.
 
 Theorem merge_LH h1 h2 :
 leftistheap h1 -> leftistheap h2 -> leftistheap (merge h1 h2).
 Proof.
-move=> /and3P[??? /and3P[*]]; apply/and3P; split;
-by [apply: merge_LI_inv |apply: merge_measure_inv|apply: merge_HO_inv]. 
+move=> /and3P[???/and3P[*]].
+by rewrite /leftistheap merge_LI_inv ?merge_measure_inv ?merge_HO_inv.
 Qed.
 
-Theorem merge_spec h1 h2 a: 
-  count a (merge h1 h2) = count a h1 + count a h2.
+Theorem merge_spec h1 h2 a:  count a (merge h1 h2) = count a h1 + count a h2.
 Proof.
-elim: h1 h2=> [h2|n x h1 IHh1 h2 IHh2]; rewrite ?merge_E_h //.
-elim=> [/=|m y h21 IHh21 h22 IHh22]; first by ssrnatlia.
-by merge_casesxy x y; rewrite makeT_spec; rewrite ?IHh2 ?IHh22 /=; ssrnatlia.
+elim: h1 h2=> [?|? x ??? IHh2] //. elim=> [/=|? y ??? IHh22]; first by ssrnatlia.
+by merge_casesxy x y; rewrite makeT_spec ?IHh2 ?IHh22 /=; ssrnatlia.
 Qed.
 
 Lemma merge_size h1 h2 : size (merge h1 h2) = size h1 + size h2.
 Proof. by rewrite !size_count ?merge_spec. Qed.
 
-Theorem merge_in_spec  h1 h2 x :
-x \in (merge h1 h2) = ((x \in h1) || (x \in h2)).
-Proof.
-by rewrite !in_count merge_spec !addn_gt0.
-Qed.
+Theorem merge_in_spec  h1 h2 x : x \in (merge h1 h2) = ((x \in h1) || (x \in h2)).
+Proof. by rewrite !in_count merge_spec !addn_gt0. Qed.
 
 (* Two defenition of insert, their equality and some properties *)
-Definition insert (x : T) h := 
-merge [[||]| measure1, x | [||]] h.
+Definition insert (x : T) h :=  merge [[||]| measure1, x | [||]] h.
 
 Fixpoint insert' (x : T) h :=
 if h is Node n y a b then
@@ -511,15 +492,13 @@ Proof. by rewrite !size_count ?merge_spec. Qed.
 
 Theorem insertE x h : measure_inv h -> leftist_inv h -> insert' x h = insert x h.
 Proof.
-rewrite /insert.
-elim h=> // n y h1 IHh1 h2 IHh2 /= /and3P[??? /and3P[*]].
+rewrite /insert. elim h=> // n y h1 IHh1 h2 IHh2 /= /and3P[??? /and3P[*]].
 merge_casesxy x y=> //; rewrite ?IHh2 // /makeT.
 have: (measure [h1 | n, y | h2] <= measure [||] = false)%N=> [|->] //.
 by apply/negbTE; rewrite -ltnNge. 
 Qed.
 
-Theorem insert_in_spec h x y :
-x \in (insert y h) = ((x == y) || (x \in h)).
+Theorem insert_in_spec h x y : x \in (insert y h) = ((x == y) || (x \in h)).
 Proof. 
 rewrite merge_in_spec /= !in_node; case (x == y); by case (x \in h).
 Qed.
@@ -529,8 +508,7 @@ Qed.
 Definition findmin h := 
 if h is Node _ x _ _ then Some x else None.
 
-Theorem findmin_None h:
-None = findmin h <-> h = [||].
+Theorem findmin_None h: None = findmin h <-> h = [||].
 Proof. split=> [|-> //]. by case : h. Qed.
 
 Theorem findmin_Some h z: heap_ordered h ->
@@ -542,20 +520,18 @@ Qed.
 Lemma findmin_cases h: (exists x, Some x = findmin h) \/ (h = Emp).
 Proof. case: h=> [|n z h1 h2 /=]; first by right. by left; exists z. Qed.
 
-Theorem findmin_spec x h:
-heap_ordered h ->
+Theorem findmin_spec x h: heap_ordered h -> 
 ((x \in h) && LE x h) <-> (Some x = findmin h).
 Proof.
 split=> [/andP[]|]; move: h H=> [] //.
 - move=> n y h1 h2 /= /and4P[L1 L2 H1 H2]
   /or3P[/eqP-> //|/(LE_correct _ _ _ H1)/(_ L1)|/(LE_correct _ _ _ H2)/(_ L2)] XY YX;
 suffices: x = y=> [-> //|]; apply: le_anti; rewrite XY YX //.
-move=> ????? [->]; apply/andP; split=> //=. by rewrite in_node eq_refl.
+move=> ????? [->]. by rewrite in_node eq_refl /=.
 Qed.
 
 (* Properties of findmin function *)
-Definition deletemin h :=
-if h is Node _ _ a b then merge a b else Emp.
+Definition deletemin h := if h is Node _ _ a b then merge a b else Emp.
 
 Lemma case_leftistheap n x h1 h2 :
 leftistheap (Node n x h1 h2) -> leftistheap h1 && leftistheap h2.
@@ -563,23 +539,15 @@ Proof.
 by rewrite/leftistheap=>/and3P[/=/and3P[_->->/=/and3P[_->->/and4P[_ _->->]]]].
 Qed.
 
-Lemma deletemin_rk_inv h:
-measure_inv h -> measure_inv (deletemin h).
-Proof.
-by case: h=> //=n x h1 h2 H; apply merge_measure_inv; move: H=> /and3P[].
-Qed.
+Lemma deletemin_rk_inv h: measure_inv h -> measure_inv (deletemin h).
+Proof. case: h=> //= ???? /and3P[*]; by rewrite merge_measure_inv. Qed.
 
-Lemma deletemin_HO_inv h:
-heap_ordered h -> heap_ordered (deletemin h).
-Proof.
-case: h=> //=n x h1 h2 H; apply merge_HO_inv; by move: H=> /and4P[].
-Qed.
+Lemma deletemin_HO_inv h: heap_ordered h -> heap_ordered (deletemin h).
+Proof. case: h=> //= ???? /and4P[*]. by rewrite merge_HO_inv. Qed.
 
-Lemma deletemin_LI_inv h:
-leftist_inv h -> leftist_inv (deletemin h).
-Proof.
-by case: h=> //=n x h1 h2 H; apply merge_LI_inv; move: H=> /and3P[].
-Qed.
+
+Lemma deletemin_LI_inv h: leftist_inv h -> leftist_inv (deletemin h).
+Proof. case: h=> //= ???? /and3P[*]. by rewrite merge_LI_inv. Qed.
 
 Lemma deletemin_correct h:
 leftistheap h -> leftistheap (deletemin h).
@@ -597,7 +565,7 @@ Proof. case: h=> // n x tl tr; by rewrite ?size_count //= merge_spec. Qed.
 Theorem deletemin_in_spec h x y:
 Some x = findmin h -> (y \in (insert x (deletemin h))) = (y \in h).
 Proof.
-case: h=> // ???? [->].
+case: h=> // ???? [->]. 
 by rewrite insert_in_spec /deletemin merge_in_spec // orbA.
 Qed.
 
@@ -609,8 +577,7 @@ Section Heapsort.
 Implicit Type hh : seq (option (heap T)).
 
 Fixpoint seq_to_seqheap (st : seq T) :=
-if st is h :: t then
-  cons [ [||]| measure1, h | [||]] (seq_to_seqheap t)
+if st is h :: t then cons [ [||]| measure1, h | [||]] (seq_to_seqheap t)
 else [::].
 
 Fixpoint count_sseq a hh := 
@@ -623,7 +590,7 @@ Fixpoint count_seq a (sh : seq (heap T)) :=
   if sh is h :: sh' then count a h + count_seq a sh' else 0.
 
 Theorem seq_to_seqheap_spec s: count_seq^~ (seq_to_seqheap s) =1 seq.count^~ s.
-Proof. move=> a; elim: s=> //= x s->; ssrnatlia. Qed.
+Proof. move=> a; elim: s=> //= ??->; ssrnatlia. Qed.
 
 (* Now we want to define fromseq function that will translate  *)
 (* sequense of elements into heap in O(n) time                 *)
@@ -665,20 +632,20 @@ Definition fromseq := fromseqheap \o seq_to_seqheap.
 Lemma fromseqheap_pop_spec a h hh : 
   count a (fromseqheap_pop h hh) = count_sseq a hh + count a h.
 Proof.
-elim: hh => [|[h'|] shh IHhh] //= in h *; by rewrite IHhh merge_spec; ssrnatlia.
+elim: hh => [|[?|]? IHhh] //= in h *; by rewrite IHhh merge_spec; ssrnatlia.
 Qed.
 
 Lemma fromseqheap_push_spec h hh a: 
   count_sseq a (fromseqheap_push h hh )= count a h + count_sseq a hh.
 Proof.
-elim: hh=> [|[sh|] hh' IHhh] //= in h *. by rewrite IHhh merge_spec; ssrnatlia.
+elim: hh=> [|[?|]? IHhh] //= in h *. by rewrite IHhh merge_spec; ssrnatlia.
 Qed.
 
 Lemma fromseqheap_rec1_spec sh hh a: 
   count a (fromseqheap_rec1 hh sh) = count_sseq a hh + count_seq a sh.
 Proof.
-elim: sh => [|h sh IHsh] /= in hh *.
-  rewrite ?fromseqheap_pop_spec //. by rewrite IHsh fromseqheap_push_spec; ssrnatlia.
+elim: sh => [|?? IHsh] /= in hh *;
+by rewrite ?fromseqheap_pop_spec // IHsh fromseqheap_push_spec; ssrnatlia.
 Qed.
 
 Lemma fromseqheap_spec sh : 
@@ -708,32 +675,28 @@ Definition some_inv sh := if sh is some h then inv h else true.
 Lemma inv_fromseqheap_pop h sh: 
   (seq.all some_inv sh) -> inv h -> inv (fromseqheap_pop h sh).
 Proof.
-elim: sh => [|[h'|] shh IHhh] //= in h *=> /andP[HH' ASH HH]; apply: IHhh=> //.
-by apply: merge_invariat.
+elim: sh=> [|[?|]? IHhh] //= in h *=> /andP[*]; by rewrite IHhh ?merge_invariat. 
 Qed.
 
-Lemma all_inv_fromseqheap_push h hh:
-  inv h -> (seq.all some_inv hh) ->
-  seq.all some_inv (fromseqheap_push h hh) = (inv h) && (seq.all some_inv hh).
+Lemma all_inv_fromseqheap_push h hh: inv h -> (seq.all some_inv hh) ->
+seq.all some_inv (fromseqheap_push h hh) = (inv h) && (seq.all some_inv hh).
 Proof.
-by elim: hh=> [|[sh|] hh' IHhh] //= in h *=> HH /andP[SH AHH];
+by elim: hh=> [|[?|]? IHhh] //= in h *=> HH /andP[SH ?]; 
 rewrite IHhh ?merge_invariat // HH SH.
 Qed.
 
 Lemma inv_fromseqheap_rec1 hh sh : 
 (seq.all some_inv  hh) -> (seq.all inv sh) -> (inv (fromseqheap_rec1 hh sh)).
 Proof.
-elim: sh => [|h sh IHsh] /= in hh *=> AHH; rewrite ?inv_fromseqheap_pop //.
-move=> /andP[HH AHS]. by apply: IHsh; rewrite ?all_inv_fromseqheap_push ?HH ?AHS ?AHH.
+elim: sh => [|h sh IHsh] /= in hh *=> ?; rewrite ?inv_fromseqheap_pop //.
+move => /andP[HH ?]. by rewrite IHsh ?all_inv_fromseqheap_push // HH.
 Qed.
 
 
-Lemma inv_fromseqheap sh : 
-seq.all inv sh -> inv (fromseqheap sh).
+Lemma inv_fromseqheap sh : seq.all inv sh -> inv (fromseqheap sh).
 Proof. move=> ASH; by rewrite fromseqheapE inv_fromseqheap_rec1. Qed.
 
-Lemma all_inv_seq_toseqheap s : 
-seq.all inv (seq_to_seqheap s).
+Lemma all_inv_seq_toseqheap s : seq.all inv (seq_to_seqheap s).
 Proof. elim: s=> //= a h->; by rewrite inv_NodexEE. Qed.
 
 Lemma inv_fromseq s : inv (fromseq s).
@@ -765,8 +728,7 @@ Next Obligation. rewrite merge_size; ssrnatlia. Qed.
 
 Lemma fromheap_spec1 h: count^~ h =1 seq.count^~ (fromheap h).
 Proof.
-move=> p. apply_funelim (fromheap h)=> // ???? /= <-.
-by rewrite merge_spec; ssrnatlia.
+move=> p. apply_funelim (fromheap h)=> // ???? /= <-. by rewrite merge_spec; ssrnatlia.
 Qed.
 
 Lemma fromheap_srec1_in x h: (x \in h) = (x \in (fromheap h)).
@@ -775,10 +737,8 @@ Proof. by rewrite !in_count -has_pred1 has_count -fromheap_spec1. Qed.
 Lemma fromheap_spec2 h: (heap_ordered h) -> sorted <=%O (fromheap h).
 Proof.
 apply_funelim (fromheap h)=> //= _ x h1 h2 IHh /and4P[L1 L2 H1 H2];
-rewrite path_sortedE ?IHh ?all_count -?count_predT -?fromheap_spec1 ?merge_spec.
-by rewrite (allE _ _ (LE_spec _ _ H1 L1)) (allE _ _ (LE_spec _ _ H2 L2))
- !size_count // eq_refl.
-- by apply: merge_HO_inv.
+rewrite path_sortedE ?IHh ?all_count -?count_predT -?fromheap_spec1 ?merge_spec ?merge_HO_inv //.
+- by rewrite (allE _ _ (LE_spec _ _ H1 L1)) (allE _ _ (LE_spec _ _ H2 L2)) !size_count // eq_refl.
 by exact le_trans.
 Qed.
 
@@ -817,8 +777,8 @@ Fixpoint grank h : nat :=
 Theorem grank_rk h : leftist_rank_inv  h -> grank h = rank h.
 Proof.
 elim: h=> // ??? IHh1 ? IHh2 /case_leftist_rank_inv/andP[].
-rewrite /f /= /f1=>_ /and3P[??].
-rewrite IHh1 // IHh2 //. by rewrite minnC ?Order.NatOrder.minnE=> ->.
+rewrite /f/=/f1=>_ /and3P[??].
+by rewrite IHh1 // IHh2 // minnC ?Order.NatOrder.minnE=> ->.
 Qed.
 
 End Grank.
@@ -830,8 +790,7 @@ Section Spine.
 Lemma length_right_spine h s:
 leftist_rank_inv h -> right s -> spine_in s h -> length s = rank h.
 Proof.
-move=> /andP[_ RC].
-elim: h s RC=> [[|[]]|????? IHtr [_ _|[s /= /and3P[_ *]|]]] //.
+move=> /andP[_ RC]. elim: h s RC=>[[|[]]|????? IHtr [_ _|[?/=/and3P[_ *]|]]] //.
 apply/eqnP=> /=; apply/eqP. by apply: IHtr.
 Qed.
 
@@ -839,16 +798,13 @@ Theorem rigth_spine_shortest H s1 s2:
  right s1 -> leftist_rank_inv H -> spine_in s1 H -> spine_in s2 H ->
 (length s1 <= length s2)%nat.
 Proof. 
-elim: H s1 s2=>
-[???? /spine_in_E->|?? tl IHtl tr IHtr [//|a s1 [??? |[]
+elim: H s1 s2=> [???? /spine_in_E->|?? tl IHtl tr IHtr [//|a s1 [??? |[]
 s2 /rigth_correct [] ->]]] //= => [? /case_leftist_rank_inv_r ?|
-? /case_leftist_rank_inv_rl /and3P[??/=?]]=>*.
-- rewrite -addn1 -[(length s2).+1]addn1 leq_add2r. by apply IHtr.
-rewrite (length_right_spine tr s1) //.
-case: (right_spine_ex tl)=> s /andP[*].
+? /case_leftist_rank_inv_rl /and3P[??/=?]]=>*;
+rewrite -?addn1 -?[(length s2).+1]addn1 leq_add2r ?IHtr //.
+rewrite (length_right_spine tr s1) //. case: (right_spine_ex tl)=> s /andP[*].
 suffices: (rank tl <= length s2)%N; first by ssrnatlia.
-rewrite -(length_right_spine tl s) //.
-by apply: IHtl.
+by rewrite -(length_right_spine tl s) // IHtl.
 Qed.
 End Spine.
 End Specifications.
