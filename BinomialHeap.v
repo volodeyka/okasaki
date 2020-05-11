@@ -46,6 +46,18 @@ elim: l h r=> [[]//??[]//[]//?/andP[]|?? IHl[[|[]]|]]//=? l []//[]// r /=/andP[/
 rewrite (IHl l r.+1) //=; by apply/andP; split.
 Qed.*)
 
+Fixpoint eqtree tr1 tr2 := true.
+
+Lemma eqtreeP : Equality.axiom eqtree.
+Proof.
+Admitted.
+
+Canonical tree_eqMixin := EqMixin eqtreeP.
+Canonical tree_eqType := Eval hnf in EqType tree tree_eqMixin.
+
+Lemma eqtreeE : eqtree = eq_op. Proof. by []. Qed.
+
+
 Fixpoint size (tr : tree) : nat :=
   match tr with [x| l] =>
     let fix binom_list l :=
@@ -201,6 +213,8 @@ Fixpoint count (a : pred T) h : nat :=
   if h is (_, th) :: t then count_tree a th + count a t
   else 0.
 
+(* heap := seq (nat * tree)*)
+
 Fixpoint mem_heap h := 
 if h is (_, tr) :: ttt then xpredU (fun x => x \in tr) (mem_heap ttt) else xpred0.
 
@@ -214,10 +228,10 @@ Canonical mem_heap_predType := PredType mem_heap.
 
 Definition consh trn h : heap := trn :: h.
 
-Lemma inE (x : T): 
-  (forall rk tr h, ((x \in consh (rk, tr) h) = (x \in h) || (x \in tr)) *
+(*Lemma inE (x : T): 
+  (forall rk tr h, ((x \in (rk, tr) :: h) = (x \in h) || (x \in tr)) *
   ((x \in [::]) = false))%type.
-Proof. split=> *; rewrite /consh /in_mem //= /in_mem /= orbC //. Qed.
+Proof. split=> *; rewrite /consh /in_mem //= /in_mem /= orbC //. Qed.*)
 
 Lemma instree_spec a tr rk h: count a (instree tr rk h) = count_tree a tr + count a h.
 Proof.
@@ -341,23 +355,62 @@ Lemma alltE a x y t l: ((allt a [x| [::]] = a x) *
 (allt a [x| [y| t] :: l] = allt a [x| l] && allt a [y|t]))%type.
 Proof.
 rewrite /allt !count_treeE // !sizeE //; split; first by case: a.
-have := (count_le_size a [x| l]); have := (count_le_size a [y| t]).
- rewrite !leq_eqVlt. => /orP[/eqP|].
+have := (count_le_size a [y| t]); have := (count_le_size a [x| l]).
+rewrite leq_eqVlt addnC=> /orP[/eqP->|C /add_le_lt/(_ C)->];
+last by move: C=> /ltn_eqF->. rewrite leq_eqVlt=> /orP[/eqP->|/ltn_eqF];
+by rewrite ?eq_refl // eqn_add2r=>->.
 Qed.
 
+Fixpoint all a h := if h is (_, th) :: t then allt a th && all a t else true.
 
 Fixpoint removemintree (ts : heap) : option (tree * heap) :=
 match ts with
 | [::]      => None
 | [:: (_, tr)]     => some (tr, [::])
-| (rk, [x| l]) :: ts =>  if removemintree ts is some ([x'| l'], ts') then
+| (rk, [x| l]) :: ts =>  
+              if removemintree ts is some ([x'| l'], ts') then
                 if x <= x' then some ([x| l], ts) 
                 else some ([x'| l'], (rk, [x| l]) :: ts)
               else None
 end.
 
+Lemma removemintree_None (ts : heap): 
+  removemintree ts = None <-> ts = [::].
+Proof.
+elim: ts=> //= [[? [?? []// a l]]].
+case: (removemintree (a :: l))=> // [[[]]*|[] /(_ erefl) //].
+by case: ifP.
+Qed.
+
+(*Lemma removeintree_some h x l h': 
+removemintree h = some ([x| l], h') <->.
+Proof.
+  
+Qed.*)
+
+
+
 Definition findmin (ts : heap) : option T :=
 if (removemintree ts) is some ([x| _], _) then some x else None.
+
+Theorem findmin_None h: None = findmin h <-> h = [::].
+Proof. 
+split=> [|-> //]. rewrite /findmin.
+case a : (removemintree h)=> [[[]]|] //*. move: a. 
+by rewrite removemintree_None.
+Qed.
+
+(*Theorem findmin_spec x h: heap_ordered h -> 
+((x \in h) && all (>= x) h) <-> (Some x = findmin h).
+Proof.
+move=> HH; split=> [/andP[]|]; move: h HH=> [|[]] //.
+- move=> rk tr l H /=. rewrite /in_mem /=.
+split=> [/andP[]|]; move: h H=> [] //.
+- move=> n y h1 h2 /= /and4P[L1 L2 H1 H2]
+  /or3P[/eqP-> //|/(LE_correct _ _ _ H1)/(_ L1)|/(LE_correct _ _ _ H2)/(_ L2)] XY YX;
+suffices: x = y=> [-> //|]; apply: le_anti; rewrite XY YX //.
+move=> ????? [->]. by rewrite in_node eq_refl /=.
+Qed.*)
   
 Fixpoint revh_rank (ts : seq tree) (rk : nat) : heap :=
 match ts with
@@ -365,12 +418,12 @@ match ts with
 | t :: ts' => (revh_rank ts' rk.-1) ++ [:: (rk, t)]
 end.
 
-Definition deleteMin (ts : heap) : heap :=
+(*Definition deleteMin (ts : heap) : heap :=
 if (removemintree ts) is some ([x| ts1], ts2) then
   if ts1 is (rk, _) :: _ then merge (revh_rank ts1 rk) ts2
   else ts2
 else [::].
 
   Definition isEmpty (ts : Heap) :=
-    if ts is [] then true else false.
+    if ts is [] then true else false.*)
 End BinomialHeap.
