@@ -22,10 +22,8 @@ end.
 
 Lemma eqtreeP : Equality.axiom eqtree.
 Proof.
-elim=> [| l IHl x r IHr] /=; case; try by constructor.
-move=> l' x' r'. apply: (iffP and3P); case.
-- by move=> eq eqll eqrr; rewrite (eqP eq) ((IHl l') eqll) ((IHr r') eqrr).
-move=> ll eq rr; split; by [apply/eqP | apply/IHl | apply/IHr].
+elim=> [|? IHl ?? IHr] /=; case=>*; try by constructor.
+by apply: (iffP idP)=> [/and3P[/eqP-> /IHl-> /IHr->]|[/IHl-> /eqP-> /IHr->]].
 Qed.
 
 Fixpoint LT (x : Elem) (Tr : Tree) : bool :=
