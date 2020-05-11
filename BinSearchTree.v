@@ -148,7 +148,7 @@ if Tr is T a y b then
   else T a y b
 else T E x E.
 
-Lemma member_LT (x x' : Elem) (Tr : Tree) (BS : BSTOrder Tr) : LT x Tr && (x' \in Tr) -> x < x'.
+Lemma member_LT (x x' : Elem) (Tr : Tree) (BS : BSTOrder Tr) : LT x Tr -> (x' \in Tr) -> x < x'.
 Proof.
 elim: Tr BS=> // l IHl y r IHr BS /andP[/and3P[LTl LTr xy] M]. case: (ltgtP x' y);
 move: (TOC _ _ _ BS)=> /and4P[G L BSl BSr].
