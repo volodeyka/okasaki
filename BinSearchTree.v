@@ -262,8 +262,7 @@ if Tr is T l y r then
   if x < y then
     if insert_aux x l is Some l' then
       Some (T l' y r)
-    else
-      None
+else None
   else if x > y then
     if insert_aux x r is Some r' then
       Some (T l y r')
