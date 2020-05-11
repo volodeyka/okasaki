@@ -52,11 +52,8 @@ Proof. by []. Qed.
 
 Lemma LEG (x x' : Elem) (Tr : Tree) : (x' < x) && LT x Tr -> LT x' Tr.
 Proof.
-elim: Tr=> //= l IHl y r IHr /and4P[x'x LTl LTr xy].
-apply/and3P; split.
-- apply: IHl; by apply/andP.
-- apply: IHr; by apply/andP.
-by apply: (lt_trans x'x xy).
+elim: Tr=> //= l IHl y r IHr /and4P[x'x ?? /(lt_trans x'x)->].
+rewrite IHl ?IHr //; apply/andP; by split.
 Qed.
 
 Lemma GTL (x x' : Elem) (Tr : Tree) : (x' > x) && GT x Tr -> GT x' Tr.
