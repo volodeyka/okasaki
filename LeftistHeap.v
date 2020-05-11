@@ -361,9 +361,7 @@ Qed.
 Lemma makeT_peserve_HO_inv x tl tr :
 heap_ordered tl -> heap_ordered tr -> LE x tl -> LE x tr ->
  heap_ordered (makeT x tl tr).
-Proof.
-rewrite /makeT; by case: ifP => _ /=->->->->.
-Qed.
+Proof. rewrite /makeT; by case: ifP => _ /=->->->->. Qed.
 
 Lemma makeT_spec h1 h2 x a:
 count a (makeT x h1 h2) = a x + count a h1 + count a h2.
@@ -400,7 +398,6 @@ end.
 
 Ltac merge_casesxy x y := case H : (x <= y); merge_cases.
 
-
 Lemma merge_E_h h: merge Emp h = h.
 Proof. by []. Qed.
 
@@ -415,7 +412,7 @@ Proof. rewrite /merge /= => ->. by elim: trr. Qed.
 Lemma merge_measure_inv h1 h2:
 measure_inv h1 -> measure_inv h2 -> measure_inv (merge h1 h2) .
 Proof.
-elim: h1 h2=> // ? x ??? IHhr. elim=> // ? y ??? IH'hr;
+elim: h1 h2=> // ? x ??? IHhr. elim=> // ? y ??? IH'hr.
 merge_casesxy x y => /and3P[E M M' /and3P[EQ M1 M2]];
 by rewrite makeT_rk_inv // (IHhr, IH'hr) //= (EQ, E) (M1, M) (M2, M').
 Qed.
@@ -692,7 +689,6 @@ elim: sh => [|h sh IHsh] /= in hh *=> ?; rewrite ?inv_fromseqheap_pop //.
 move => /andP[HH ?]. by rewrite IHsh ?all_inv_fromseqheap_push // HH.
 Qed.
 
-
 Lemma inv_fromseqheap sh : seq.all inv sh -> inv (fromseqheap sh).
 Proof. move=> ASH; by rewrite fromseqheapE inv_fromseqheap_rec1. Qed.
 
@@ -705,7 +701,6 @@ End Invariant.
 
 Lemma measure_inv_E : measure_inv [||].
 Proof. by []. Qed.
-
 
 Definition rank_rk_fromseq : forall s, measure_inv (fromseq s) := 
   inv_fromseq measure_inv merge_measure_inv measure_inv_E measure_inv_NodexEE.
@@ -798,10 +793,10 @@ Theorem rigth_spine_shortest H s1 s2:
  right s1 -> leftist_rank_inv H -> spine_in s1 H -> spine_in s2 H ->
 (length s1 <= length s2)%nat.
 Proof. 
-elim: H s1 s2=> [???? /spine_in_E->|?? tl IHtl tr IHtr [//|a s1 [??? |[]
-s2 /rigth_correct [] ->]]] //= => [? /case_leftist_rank_inv_r ?|
-? /case_leftist_rank_inv_rl /and3P[??/=?]]=>*;
-rewrite -?addn1 -?[(length s2).+1]addn1 leq_add2r ?IHtr //.
+elim: H s1 s2=> [????/spine_in_E->|?? tl IHtl tr IHtr [//|a s1 [??? 
+|[] s2 /rigth_correct [] ->]]] //= => [? /case_leftist_rank_inv_r ?|
+? /case_leftist_rank_inv_rl /and3P[??/=?]]=>*.
+- rewrite -addn1 -[(length s2).+1]addn1 leq_add2r IHtr //.
 rewrite (length_right_spine tr s1) //. case: (right_spine_ex tl)=> s /andP[*].
 suffices: (rank tl <= length s2)%N; first by ssrnatlia.
 by rewrite -(length_right_spine tl s) // IHtl.
