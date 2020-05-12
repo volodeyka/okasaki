@@ -198,35 +198,58 @@ else m.
 
 Definition makelist' (Tr : Tree) := makelist_aux Tr [::].
 
-Lemma makelistE (Tr : Tree) (BS : BSTOrder Tr) : makelist Tr = makelist' Tr.
+Lemma makelistE (Tr : Tree) : makelist Tr = makelist' Tr.
 Proof.
 have: (forall m, makelist_aux Tr m = makelist Tr ++ m).
-- elim: Tr BS=> //= l IHl x r IHr /and4P[????] m.
+- elim: Tr=> //= l IHl x r IHr m.
   by rewrite IHl // IHr // -catA.
 move=> aux. rewrite/makelist'. by rewrite aux cats0.
+Qed.
+
+Lemma inlist (Tr : Tree) (x : Elem) :
+  x \in makelist Tr <-> x \in Tr.
+Proof.
+elim: Tr=> //= l IHl y r IHr.
+rewrite mem_cat in_cons is_member.
+split.
+- move=> /or3P[/IHl->|/eqP->|/IHr->] //. by rewrite eq_refl.
+move=> /or3P[/eqP->|/IHl->|/IHr->] //. by rewrite eq_refl.
+Qed.
+
+Lemma bstlr (l r : Tree) (x a b : Elem) : BSTOrder (T l x r) -> a \in l -> b \in r -> a < b.
+Proof.
+move=> /= /and4P[GTl LTr BSl BSr] al br.
+have: x < b.
+- apply: member_LT; first by exact: BSr. exact: LTr. exact: br.
+have: a < x. 
+- apply: member_GT; first by exact: BSl. exact: GTl. exact: al.
+move=> /lt_trans; apply.
+Qed.
+
+Lemma mlistlr (l r : Tree) (x a b : Elem) :
+  BSTOrder (T l x r) -> a \in makelist l -> b \in makelist r -> a < b.
+Proof.
+move=> BS /inlist al /inlist br.
+apply: bstlr. exact: BS. exact: al. exact: br.
 Qed.
 
 Lemma list_of_tree_sorted (Tr : Tree) (BS : BSTOrder Tr) : sorted <=%O (makelist Tr).
 Proof.
 elim: Tr BS=> //= l IHl x r IHr /and4P[GTl LTr BSl BSr].
 move: (IHl BSl) (IHr BSr)=> Sl Sr.
-have: (merge <=%O (makelist l) (x :: makelist r) = makelist l ++ x :: makelist r).
-admit.
-move=> aux; rewrite -aux. apply: merge_sorted=> //=; first by apply: le_total.
-rewrite path_sortedE; last by apply: le_trans.
-apply/andP; split=> //.
-rewrite makelistE //.
-elim: (r) LTr=> //= l' IHl' x' r' IHr' /and3P[LTl' LTr' lt].
-move: (IHl' LTl') (IHr' LTr')=> Al' Ar'.
-have: (forall m, all (>= x) (makelist_aux l' m) = all (>= x) (makelist_aux l' [::] ++ m)).
-- elim: (l') LTl'=> //= l'' IHl'' x'' r'' IHr'' /and3P[LTl'' LTr'' xs] m.
-  rewrite IHl'' // !all_cat !IHl'' //=  !all_cat !IHr'' //= ltW //= all_cat Bool.andb_true_r.
-  apply/andP/andP; first by move=> [H1 /andP[H2 H3]]; split=> //; apply/andP.
-  by move=> [/andP[H1 H2] H3]; split=> //; apply/andP.
-move=> aux'. rewrite/makelist' /= aux' all_cat.
-apply/andP; split; first by apply: IHl'=> /=. apply/andP; split=> //.
-by apply: ltW.
-Admitted.
+have: sorted <=%O (x :: makelist r).
+- rewrite /= path_sortedE; last by apply: le_trans. apply/andP. split; last by [].
+  elim: (r) LTr=> //= l' IHl' y r' IHr' /and3P[LTl' LTr' xy].
+  rewrite all_cat IHl' //= IHr' ?ltW //.
+move=> /= Sxr.
+case E: (makelist l)=> [// |y l']. move: (Sl).
+rewrite E cat_cons /= cat_path=> -> /=.
+have: (last y l') \in makelist l.
+- rewrite E. apply: mem_last.
+rewrite inlist=> lyl. apply/andP. split.
+- apply: ltW. apply: member_GT. exact: BSl. exact: GTl. exact: lyl.
+exact: Sxr.
+Qed.
 
 Lemma mem_hVtr (x y : Elem) (Tr : Tree) (BS : BSTOrder Tr) :
   x \in (insert y Tr) = (x == y) || (x \in Tr).
