@@ -29,7 +29,7 @@ end.
 
 Lemma eqtreeP : Equality.axiom eqtree.
 Proof.
-elim=> [|? IHl ?? IHr] /=; case=>*; try by constructor.
+elim=> [|? IHl ?? IHr] /= [] *; try by constructor.
 by apply: (iffP idP)=> [/and3P[/eqP-> /IHl-> /IHr->]|[/IHl-> /eqP-> /IHr->]].
 Qed.
 
@@ -60,13 +60,13 @@ Proof. by []. Qed.
 Lemma LEG (x x' : Elem) (Tr : Tree) : (x' < x) && LT x Tr -> LT x' Tr.
 Proof.
 elim: Tr=> //= l IHl y r IHr /and4P[x'x ?? /(lt_trans x'x)->].
-rewrite IHl ?IHr //; apply/andP; by split.
+by rewrite IHl ?IHr // x'x.
 Qed.
 
 Lemma GTL (x x' : Elem) (Tr : Tree) : (x' > x) && GT x Tr -> GT x' Tr.
 Proof.
 elim: Tr=> //= l IHl y r IHr /and4P[xx' ?? /lt_trans->] //.
-rewrite IHl ?IHr //; apply/andP; by split.
+by rewrite IHl ?IHr // xx'.
 Qed.
 
 Canonical tree_eqMixin := EqMixin eqtreeP.
