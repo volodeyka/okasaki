@@ -1,5 +1,5 @@
+From Coq Require Import Lia.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat seq path eqtype order.
-Require Import Psatz.
 Import Order.TTheory.
 Open Scope order_scope.
 
