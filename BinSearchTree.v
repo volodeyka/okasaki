@@ -90,7 +90,8 @@ Qed.
 Lemma is_member x l y r : x \in T l y r = [|| x == y, x \in l | x \in r].
 Proof. by []. Qed.
 
-Lemma is_left (l r : Tree) (x y : Elem) (BS : BSTOrder (T l y r)) : x < y -> x \in T l y r = (x \in l).
+Lemma is_left (l r : Tree) (x y : Elem) (BS : BSTOrder (T l y r)) :
+  x < y -> x \in T l y r = (x \in l).
 Proof.
 move=> xy. rewrite is_member. apply/or3P. move: (TOC _ _ _ BS)=> /and4P[? L ??].
 case: ifP=> ->; first by apply/or3P.
@@ -99,7 +100,8 @@ elim: (r) L=> //= l' IHl' x' r' IHr' /and3P[LTl' LTr' yx'].
 by rewrite is_member !negb_or (lt_eqF (lt_trans xy yx')) ?IHl' ?IHr'.
 Qed.
 
-Lemma is_right (l r : Tree) (x y : Elem) (BS : BSTOrder (T l y r)) : x > y -> x \in T l y r = (x \in r).
+Lemma is_right (l r : Tree) (x y : Elem) (BS : BSTOrder (T l y r)) :
+  x > y -> x \in T l y r = (x \in r).
 Proof.
 move=> yx. rewrite is_member. apply/or3P. move: (TOC _ _ _ BS)=> /and4P[G ???].
 case: ifP=> ->; first by apply/or3P.
@@ -110,23 +112,24 @@ Qed.
 
 (** member function with at most d + 1 comparisons where d is the depth of a tree*)
 Fixpoint candidate (x : Elem) (Tr : Tree) (cand : option Elem) : bool :=
-if Tr is T l y r then
-  if x < y then candidate x l cand
-  else candidate x r (Some y)
-else if cand is Some c then
-       if x == c then true else false
-     else false.
+  if Tr is T l y r then
+    if x < y then candidate x l cand
+    else candidate x r (Some y)
+  else if cand is Some c then
+         if x == c then true else false
+       else false.
 
 Definition member' (x : Elem) (Tr : Tree) : bool := candidate x Tr None.
 
 Lemma nhd_member (x x' : Elem) (Tr : Tree) (BS : BSTOrder Tr) (NEQ : x != x') :
-      candidate x Tr None = candidate x Tr (Some x').
+  candidate x Tr None = candidate x Tr (Some x').
 Proof.
 elim: Tr BS=> /= [| l IHl y r IHr /and4P[*]]; first by rewrite ifN_eq.
 case: ltgtP=> // xy; by apply: IHl.
 Qed.
 
-Lemma mem_in_hd (x : Elem) (Tr: Tree) (L : LT x Tr) : candidate x Tr (Some x).
+Lemma mem_in_hd (x : Elem) (Tr: Tree) (L : LT x Tr) :
+  candidate x Tr (Some x).
 Proof.
 elim: Tr L=> [| ? IHl ??? L /=]; first by rewrite /= eqxx.
 move: (LTC _ _ _ _ L)=> /and3P[?? xx']; by rewrite xx' IHl.
@@ -143,11 +146,11 @@ move=> ->; rewrite mem_in_hd // is_member eq_refl //.
 Qed.
 
 Fixpoint insert (x : Elem) (Tr : Tree) : Tree :=
-if Tr is T a y b then
-  if x < y then T (insert x a) y b
-  else if x > y then T a y (insert x b)
-  else T a y b
-else T E x E.
+  if Tr is T a y b then
+    if x < y then T (insert x a) y b
+    else if x > y then T a y (insert x b)
+    else T a y b
+  else T E x E.
 
 Lemma member_LT (x x' : Elem) (Tr : Tree) (BS : BSTOrder Tr) : LT x Tr -> (x' \in Tr) -> x < x'.
 Proof.
@@ -186,14 +189,14 @@ move=> /= ? G L BSl BSr; rewrite (insert_GT, insert_LT) // (IHl, IHr) // (L, G) 
 Qed.
 
 Fixpoint makelist (Tr : Tree) :=
-if Tr is T l x r then
-  makelist l ++ x :: makelist r
-else [::].
+  if Tr is T l x r then
+    makelist l ++ x :: makelist r
+  else [::].
 
 Fixpoint makelist_aux (Tr : Tree) (m : seq Elem) :=
-if Tr is T l x r then
-  makelist_aux l (x :: makelist_aux r m)
-else m.
+  if Tr is T l x r then
+    makelist_aux l (x :: makelist_aux r m)
+  else m.
 
 Definition makelist' (Tr : Tree) := makelist_aux Tr [::].
 
@@ -232,7 +235,8 @@ move=> BS /inlist al /inlist br.
 apply: bstlr. exact: BS. exact: al. exact: br.
 Qed.
 
-Lemma list_of_tree_sorted (Tr : Tree) (BS : BSTOrder Tr) : sorted <=%O (makelist Tr).
+Lemma list_of_tree_sorted (Tr : Tree) (BS : BSTOrder Tr) :
+  sorted <=%O (makelist Tr).
 Proof.
 elim: Tr BS=> //= l IHl x r IHr /and4P[GTl LTr BSl BSr].
 move: (IHl BSl) (IHr BSr)=> Sl Sr.
@@ -262,26 +266,27 @@ move: (TOC _ _ _ BS)=> /and4P[*];
 by rewrite ?IHl ?IHr ?(lt_eqF xy) ?(gt_eqF xy) // xy ?x'y ?eq_refl.
 Qed.
 
-Lemma already_mem (x : Elem) (Tr : Tree) (BS : BSTOrder Tr) : x \in Tr -> insert x Tr = Tr.
+Lemma already_mem (x : Elem) (Tr : Tree) (BS : BSTOrder Tr) :
+  x \in Tr -> insert x Tr = Tr.
 Proof.
 elim: Tr BS=> //= l IHl y r IHr /and4P[GTl LTr BSl BSr]. case: ltgtP=> xy //= xint;
 rewrite (IHl BSl, IHr BSr) // -(is_left l r x y, is_right l r x y) //; by apply/and4P.
 Qed.
 
 Fixpoint insert_aux (x : Elem) (Tr : Tree) : option Tree :=
-if Tr is T l y r then
-  if x < y then
-    if insert_aux x l is Some l' then
-      Some (T l' y r)
-    else None
-  else if x > y then
-    if insert_aux x r is Some r' then
-      Some (T l y r')
-    else None
+  if Tr is T l y r then
+    if x < y then
+      if insert_aux x l is Some l' then
+        Some (T l' y r)
+      else None
+    else if x > y then
+           if insert_aux x r is Some r' then
+             Some (T l y r')
+           else None
+         else
+           Some (T l y r)
   else
-    Some (T l y r)
-else
-  Some (T E x E).
+    Some (T E x E).
 
 Definition insert' (x : Elem) (Tr : Tree) : Tree :=
   if insert_aux x Tr is Some t then t else E.
