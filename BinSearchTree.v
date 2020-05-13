@@ -34,27 +34,27 @@ by apply: (iffP idP)=> [/and3P[/eqP-> /IHl-> /IHr->]|[/IHl-> /eqP-> /IHr->]].
 Qed.
 
 Fixpoint LT (x : Elem) (Tr : Tree) : bool :=
-if Tr is T l y r then [&& LT x l, LT x r & (x < y)] else true.
+  if Tr is T l y r then [&& LT x l, LT x r & (x < y)] else true.
 
 Fixpoint GT (x : Elem) (Tr : Tree) : bool :=
-if Tr is T l y r then [&& GT x l, GT x r & (x > y)] else true.
+  if Tr is T l y r then [&& GT x l, GT x r & (x > y)] else true.
 
 Fixpoint BSTOrder (Tr : Tree) : bool :=
-if Tr is T l x r then [&& GT x l, LT x r, BSTOrder l & BSTOrder r] else true.
+  if Tr is T l x r then [&& GT x l, LT x r, BSTOrder l & BSTOrder r] else true.
 
 Lemma TOC l x r :
-BSTOrder (T l x r) ->
-[&& GT x l, LT x r, (BSTOrder l) & (BSTOrder r)].
+  BSTOrder (T l x r) ->
+  [&& GT x l, LT x r, (BSTOrder l) & (BSTOrder r)].
 Proof. by []. Qed.
 
 Lemma LTC x l y r :
-LT x (T l y r) ->
-[&& LT x l, LT x r & (x < y)].
+  LT x (T l y r) ->
+  [&& LT x l, LT x r & (x < y)].
 Proof. by []. Qed.
 
 Lemma GTC x l y r :
-GT x (T l y r) ->
-[&& GT x l, GT x r & (x > y)].
+  GT x (T l y r) ->
+  [&& GT x l, GT x r & (x > y)].
 Proof. by []. Qed.
 
 Lemma LEG (x x' : Elem) (Tr : Tree) : (x' < x) && LT x Tr -> LT x' Tr.
