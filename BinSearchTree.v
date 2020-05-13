@@ -20,6 +20,7 @@ Inductive Tree := E | T : Tree -> Elem -> Tree -> Tree.
 
 Definition EmptyTree := E.
 
+(* equality *)
 Fixpoint eqtree t1 t2 :=
 match t1, t2 with
 | E, E => true
@@ -32,6 +33,23 @@ Proof.
 elim=> [|? IHl ?? IHr] /= [] *; try by constructor.
 by apply: (iffP idP)=> [/and3P[/eqP-> /IHl-> /IHr->]|[/IHl-> /eqP-> /IHr->]].
 Qed.
+Canonical tree_eqMixin := EqMixin eqtreeP.
+Canonical tree_eqType := Eval hnf in EqType Tree tree_eqMixin.
+
+Lemma eqtreeE : eqtree = eq_op.
+Proof. by []. Qed.
+
+(* membership predicat *)
+Fixpoint mem_tree t :=
+  if t is T l x r then xpredU1 x (xpredU (mem_tree l) (mem_tree r)) else xpred0.
+
+Definition tree_eqclass := Tree.
+Identity Coercion tree_of_eqclass : tree_eqclass >-> Tree.
+Coercion pred_of_tree (t : tree_eqclass) : {pred Elem} := mem_tree t.
+Canonical tree_predType := PredType pred_of_tree.
+(* The line below makes mem_seq a canonical instance of topred. *)
+Canonical mem_seq_predType := PredType mem_tree.
+
 
 Fixpoint LT (x : Elem) (Tr : Tree) : bool :=
   if Tr is T l y r then [&& LT x l, LT x r & (x < y)] else true.
@@ -68,22 +86,6 @@ Proof.
 elim: Tr=> //= l IHl y r IHr /and4P[xx' ?? /lt_trans->] //.
 by rewrite IHl ?IHr // xx'.
 Qed.
-
-Canonical tree_eqMixin := EqMixin eqtreeP.
-Canonical tree_eqType := Eval hnf in EqType Tree tree_eqMixin.
-
-Lemma eqtreeE : eqtree = eq_op.
-Proof. by []. Qed.
-
-Fixpoint mem_tree t :=
-  if t is T l x r then xpredU1 x (xpredU (mem_tree l) (mem_tree r)) else xpred0.
-
-Definition tree_eqclass := Tree.
-Identity Coercion tree_of_eqclass : tree_eqclass >-> Tree.
-Coercion pred_of_tree (t : tree_eqclass) : {pred Elem} := mem_tree t.
-Canonical tree_predType := PredType pred_of_tree.
-(* The line below makes mem_seq a canonical instance of topred. *)
-Canonical mem_seq_predType := PredType mem_tree.
 
 Lemma is_member x l y r : x \in T l y r = [|| x == y, x \in l | x \in r].
 Proof. by []. Qed.
