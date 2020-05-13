@@ -115,8 +115,7 @@ Fixpoint candidate (x : Elem) (Tr : Tree) (cand : option Elem) : bool :=
   if Tr is T l y r then
     if x < y then candidate x l cand
     else candidate x r (Some y)
-  else if cand is Some c then
-         if x == c then true else false
+  else if cand is Some c then x == c
        else false.
 
 Definition member' (x : Elem) (Tr : Tree) : bool := candidate x Tr None.
@@ -124,7 +123,7 @@ Definition member' (x : Elem) (Tr : Tree) : bool := candidate x Tr None.
 Lemma nhd_member (x x' : Elem) (Tr : Tree) (BS : BSTOrder Tr) (NEQ : x != x') :
   candidate x Tr None = candidate x Tr (Some x').
 Proof.
-elim: Tr BS=> /= [| l IHl y r IHr /and4P[*]]; first by rewrite ifN_eq.
+elim: Tr BS=> /= [_ | l IHl y r IHr /and4P[*]]; first by rewrite (negbTE NEQ).
 case: ltgtP=> // xy; by apply: IHl.
 Qed.
 
