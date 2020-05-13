@@ -9,10 +9,7 @@ Proof. by case; case. Qed.
 Lemma orsndelim : forall a b, [ || a, true | b] = true.
 Proof. by case; case. Qed.
 
-Lemma orsnd : forall a, a || true = true.
-Proof. by case. Qed.
-
-Hint Resolve orlastelim orsndelim orsnd : core.
+Hint Resolve orlastelim orsndelim : core.
 
 Module BST.
 Section BinSearchTree.
