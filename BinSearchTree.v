@@ -9,10 +9,7 @@ Proof. by case; case. Qed.
 Lemma orsndelim : forall a b, [ || a, true | b] = true.
 Proof. by case; case. Qed.
 
-Lemma swap : forall a b c, [ || a, b | c] = [ || b, a | c].
-Proof. by case; case; case. Qed.
-
-Hint Resolve orlastelim orsndelim swap : core.
+Hint Resolve orlastelim orsndelim : core.
 
 Module BST.
 Section BinSearchTree.
@@ -217,7 +214,7 @@ Lemma inlist t (x : Elem) :
   (x \in makelist t) = (x \in t).
 Proof.
 elim: t=> //= l IHl y r IHr.
-by rewrite mem_cat in_cons is_member -IHl -IHr.
+by rewrite mem_cat in_cons is_member -IHl -IHr orbCA.
 Qed.
 
 Lemma bstlr l r (x a b : Elem) : BSTOrder (T l x r) -> a \in l -> b \in r -> a < b.
