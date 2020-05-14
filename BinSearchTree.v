@@ -297,5 +297,45 @@ have: Some (insert x t) = insert_aux x t.
 rewrite/insert'. by move=> <-.
 Qed.
 
+Fixpoint omin t :=
+  if t is T l y r then
+    if l is T l' x r' then
+      omin l
+    else if l is T E x r' then Some x
+    else Some y
+  else None.
+
+Arguments omin : simpl nomatch.
+
+Lemma nonemptymin t : t != E -> exists x, omin t = Some x.
+Proof.
+elim: t=> //= l IHl x r IHr _.
+case: l IHl=> //= [* | l' y r' IHl]; first by exists x. by apply: IHl.
+Qed.
+
+Lemma minint t x : omin t = Some x -> x \in t.
+Proof.
+elim: t=> //= l IHl y r IHr min.
+rewrite is_member.
+case eq: (l) IHl min.
+- move=> _ /= [->]. by rewrite eq_refl.
+move=> /= IHl min. by rewrite IHl.
+Qed.
+
+Lemma ismin t y (bst : BSTOrder t) :
+  omin t = Some y -> forall x, x \in t -> y <= x.
+Proof.
+elim: t bst=> //= l IHl x r IHr /and4P[GTl LTr BSl BSr] min x'.
+rewrite is_member=> /or3P[/eqP -> | x'l | x'r]; case eq: (l) IHl BSl min=> IHl BSl /=.
+- by move=> [->].
+- move=> min. apply: ltW. apply: member_GT; first by exact: BSl. by rewrite -eq. exact: minint.
+- move=> [<-]. apply: ltW. apply: member_LT; first by exact: BSl. by []. by rewrite eq in x'l.
+- move=> min. by rewrite IHl // -eq.
+- move=> [<-]. apply: ltW. apply: member_LT; first by exact: BSr. by []. by [].
+move=> min. rewrite -eq in min. rewrite -eq in BSl. move: (minint l y min)=> yl.
+apply: ltW. apply: bstlr=> /=. apply/and4P. split; first by exact: GTl.
+exact: LTr. by []. by []. by []. by [].
+Qed.
+
 End BinSearchTree.
 End BST.
