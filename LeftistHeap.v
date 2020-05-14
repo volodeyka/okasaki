@@ -92,6 +92,7 @@ if h is Emp then true else false.
 Theorem emptyP h : reflect (h = Emp) (empty h).
 Proof. case h; by constructor. Qed.
 
+
 (* Definition of decidable equality on Heaps  *)
 Fixpoint eqheap h1 h2 :=
   match h1, h2 with
@@ -539,7 +540,7 @@ Qed.
 Lemma deletemin_rk_inv h: measure_inv h -> measure_inv (deletemin h).
 Proof. case: h=> //= ???? /and3P[*]; by rewrite merge_measure_inv. Qed.
 
-Lemma deletemin_HO_inv h: heap_ordered h -> heap_ordered (deletemin h).
+Lemma deletemin_ho_inv h: heap_ordered h -> heap_ordered (deletemin h).
 Proof. case: h=> //= ???? /and4P[*]. by rewrite merge_HO_inv. Qed.
 
 
