@@ -208,7 +208,7 @@ move=> aux. rewrite/makelist'. by rewrite aux cats0.
 Qed.
 
 Lemma inlist (Tr : Tree) (x : Elem) :
-  x \in makelist Tr <-> x \in Tr.
+  x \in makelist Tr = x \in Tr.
 Proof.
 elim: Tr=> //= l IHl y r IHr.
 rewrite mem_cat in_cons is_member.
