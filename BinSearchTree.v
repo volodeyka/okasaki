@@ -9,7 +9,10 @@ Proof. by case; case. Qed.
 Lemma orsndelim : forall a b, [ || a, true | b] = true.
 Proof. by case; case. Qed.
 
-Hint Resolve orlastelim orsndelim : core.
+Lemma swap : forall a b c, [ || a, b | c] = [ || b, a | c].
+Proof. by case; case; case. Qed.
+
+Hint Resolve orlastelim orsndelim swap : core.
 
 Module BST.
 Section BinSearchTree.
@@ -208,13 +211,10 @@ move=> aux. rewrite/makelist'. by rewrite aux cats0.
 Qed.
 
 Lemma inlist (Tr : Tree) (x : Elem) :
-  x \in makelist Tr = x \in Tr.
+  (x \in makelist Tr) = (x \in Tr).
 Proof.
 elim: Tr=> //= l IHl y r IHr.
-rewrite mem_cat in_cons is_member.
-split.
-- move=> /or3P[/IHl->|/eqP->|/IHr->] //. by rewrite eq_refl.
-move=> /or3P[/eqP->|/IHl->|/IHr->] //. by rewrite eq_refl.
+by rewrite mem_cat in_cons is_member -IHl -IHr.
 Qed.
 
 Lemma bstlr (l r : Tree) (x a b : Elem) : BSTOrder (T l x r) -> a \in l -> b \in r -> a < b.
@@ -230,8 +230,8 @@ Qed.
 Lemma mlistlr (l r : Tree) (x a b : Elem) :
   BSTOrder (T l x r) -> a \in makelist l -> b \in makelist r -> a < b.
 Proof.
-move=> BS /inlist al /inlist br.
-apply: bstlr. exact: BS. exact: al. exact: br.
+move=> BS. rewrite !inlist.
+apply: bstlr. exact: BS.
 Qed.
 
 Lemma list_of_tree_sorted (Tr : Tree) (BS : BSTOrder Tr) :
