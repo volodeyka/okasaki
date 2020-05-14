@@ -5,6 +5,5 @@
 -arg -w -arg -non-reversible-notation
 
 ssrlia.v
-LeftistHeap.v
 BinomialHeap.v
 
