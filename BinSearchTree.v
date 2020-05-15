@@ -122,11 +122,11 @@ Fixpoint candidate (x : Elem) t (cand : option Elem) : bool :=
 
 Definition member' (x : Elem) t : bool := candidate x t None.
 
-Lemma nhd_member (x y : Elem) t (bst : BSTOrder t) :
+Lemma nhd_member (x y : Elem) t :
   x != y -> candidate x t None = candidate x t (Some y).
 Proof.
 move=> neq_xy.
-elim: t bst=> /= [_ | l IHl z r IHr /and4P[*]]; first by rewrite (negbTE neq_xy).
+elim: t => /= [ | l IHl z r IHr]; first by rewrite (negbTE neq_xy).
 case: ltgtP=> // xy; by apply: IHl.
 Qed.
 
