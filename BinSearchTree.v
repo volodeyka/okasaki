@@ -337,5 +337,106 @@ apply: ltW. apply: bstlr=> /=. apply/and4P. split; first by exact: GTl.
 exact: LTr. by []. by []. by []. by [].
 Qed.
 
+Fixpoint treewithoutmin t :=
+  if t is T l y r then
+    if l is T l' x r' then
+      T (treewithoutmin l) y r
+    else r
+  else E.
+
+Arguments treewithoutmin : simpl nomatch.
+
+Lemma hNleft l r x (bst : BSTOrder (T l x r)) : x \notin l.
+Proof.
+elim: l bst=> //= l' IHl' y r' IHr' /and4P[/and3P[???] ? /and4P[*]].
+by rewrite is_member !negb_or gt_eqF ?IHl' ?IHr' //; apply/and4P; split.
+Qed.
+
+Lemma hNright l r x (bst : BSTOrder (T l x r)) : x \notin r.
+Proof.
+elim: r bst=> // l' IHl' y r' IHr' /= /and4P[] ? /and3P[] ???? /and4P[*].
+by rewrite is_member !negb_or lt_eqF ?IHl' ?IHr' //=; apply/and4P; split.
+Qed.
+
+Lemma nomin t y (bst : BSTOrder t) : omin t = Some y -> y \notin (treewithoutmin t).
+Proof.
+elim: t bst=> //= l IHl x r IHr /and4P[GTl LTr BSl BSr] min.
+case eq: (l) IHl BSl min=> //.
+- move=> _ _ /= [<-]. apply: hNright=> /=. apply/and4P.
+  split; first by exact: GTl. by []. by rewrite eq. by [].
+move=> IHl BSl min. rewrite is_member !negb_or.
+have: y \in l.
+- by rewrite minint // eq.
+move=> yl. apply/and3P. split.
+- rewrite lt_eqF //. apply: member_GT. exact: BSl. by rewrite -eq. by rewrite -eq.
+- rewrite IHl //.
+apply: contra_eqN. move=> yr.
+have: y != y.
+- rewrite lt_eqF //. apply: bstlr=> /=. apply/and4P.
+  split; first by exact: GTl. exact: LTr. by rewrite eq. by []. by []. by [].
+move=> yy. exact: yy. by [].
+Qed.
+
+Lemma stillinbst t x y (bst : BSTOrder t) :
+  omin t = Some y -> x \in t -> x != y -> x \in (treewithoutmin t).
+Proof.
+elim: t bst=> //= l IHl x' r IHr /and4P[GTl LTr BSl BSr min].
+rewrite is_member=> /or3P[/eqP xx' | xl | xr] /eqP neq_xy.
+- case eq: l IHl GTl BSl min=> [| l' y' r'] //=.
+  - move=> _ _ _ []. move: xx' neq_xy=> -> neq_x'y x'y. by move: x'y neq_x'y=> ->.
+  move=> IHl GTl BSl min. by rewrite is_member xx' eq_refl.
+- case eq: l IHl GTl BSl min=> [| l' y' r'] //=.
+  - move=> _ _ _ _. by move: eq xl=> ->.
+  move=> IHl GTl BSl min. rewrite is_member IHl // -?eq //; by apply/eqP.
+case eq: l IHl GTl BSl min=> [| l' y' r'] //=.
+move=> IHl GTl BSl min. by rewrite is_member xr.
+Qed.
+
+Lemma wasinbst t x : x \in (treewithoutmin t) -> x \in t.
+Proof.
+elim: t=> // l IHl y r IHr xtt.
+case eq: l IHl xtt=> [/= | l' x' r'].
+- move=> _ xr. by rewrite is_member xr.
+move=> IHl /=. rewrite is_member is_member=> /or3P[/eqP ->| xtl | ->] //; first by rewrite eq_refl.
+by rewrite IHl.
+Qed.
+
+Lemma LTeq x t : LT x t <-> forall y, y \in t -> x < y.
+Proof.
+elim: t=> //= l IHl x' r IHr.
+split.
+- move=> /and3P[LTl LTr xx'] y. rewrite is_member=> /or3P[/eqP -> // | yl | yr].
+  - move: y yl. by rewrite -IHl.
+  move: y yr. by rewrite -IHr.
+move=> H. apply/and3P. split.
+- rewrite IHl=> y yl. by rewrite H // is_member yl.
+- rewrite IHr=> y yr. by rewrite H // is_member yr.
+by rewrite H // is_member eq_refl.
+Qed.
+
+Lemma GTeq x t : GT x t <-> forall y, y \in t -> x > y.
+Proof.
+elim: t=> //= l IHl x' r IHr.
+split.
+- move=> /and3P[GTl GTr x'x] y. rewrite is_member=> /or3P[/eqP -> // | yl | yr].
+  - move: y yl. by rewrite -IHl.
+  move: y yr. by rewrite -IHr.
+move=> H. apply/and3P. split.
+- rewrite IHl=> y yl. by rewrite H // is_member yl.
+- rewrite IHr=> y yr. by rewrite H // is_member yr.
+by rewrite H // is_member eq_refl.
+Qed.
+
+Lemma stillbst t (bst : BSTOrder t) : BSTOrder (treewithoutmin t).
+Proof.
+elim: t bst=> //= l IHl x r IHr /and4P[GTl LTr BSl BSr].
+case eq: (l) IHl BSl GTl=> [|l' y r'] //= IHl BSl GTl. apply/and4P.
+split=> //; last by rewrite IHl.
+rewrite GTeq.
+have: forall y0 : Elem, y0 \in (T l' y r') -> y0 < x.
+- by rewrite -GTeq /=.
+move=> H y' y't. by rewrite H // wasinbst.
+Qed.
+
 End BinSearchTree.
 End BST.
