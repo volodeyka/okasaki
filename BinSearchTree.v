@@ -380,12 +380,12 @@ Lemma stillinbst t x y (bst : BSTOrder t) :
 Proof.
 elim: t bst=> //= l IHl x' r IHr /and4P[GTl LTr BSl BSr min].
 rewrite is_member=> /or3P[/eqP xx' | xl | xr] /eqP neq_xy;
-case eq: l IHl GTl BSl min=> [| l' y' r'] //=.
-- move=> _ _ _ [x'y]. by move: x'y xx' neq_xy=>->->.
-- move=> IHl GTl BSl min. by rewrite is_member xx' eq_refl.
-- move=> _ _ _ _. by move: eq xl=>->.
-- move=> IHl GTl BSl min. rewrite is_member IHl // -?eq //; by apply/eqP.
-move=> IHl GTl BSl min. by rewrite is_member xr.
+case eq: l IHl GTl BSl min=> [| l' y' r'] //= IHl ??.
+- move=> [x'y]. by move: x'y xx' neq_xy=>->->.
+- move=> min. by rewrite is_member xx' eq_refl.
+- move=> _. by move: eq xl=>->.
+- move=> min. rewrite is_member IHl // -?eq //; by apply/eqP.
+move=> min. by rewrite is_member xr.
 Qed.
 
 Lemma wasinbst t x : x \in (treewithoutmin t) -> x \in t.
