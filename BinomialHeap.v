@@ -686,16 +686,16 @@ by rewrite removemintree_None.
 Qed.
 
 Theorem findmin_spec x h: heap_ordered h -> 
-((x \in h) && all (>= x) h) <-> (Some x = findmin h).
+reflect  (Some x = findmin h) ((x \in h) && all (>= x) h).
 Proof.
-move=> HH; split=> [/andP[]|]. 
+move=> HH; apply: Bool.iff_reflect. split=> [|/andP[]]. 
+- elim: h HH=> // [[ rk [y l t IHh HH]]]. rewrite /findmin.
+  case H: (removemintree ((rk, [y | l]) :: t))=> [[[[]]]|] // [EQ].
+  by move: EQ H=><- /(removeintree_some HH)[-> /=].
 rewrite /findmin. case H': (removemintree h)=> [[[[]]]|].
 - move: H'=> /(removeintree_some HH) => [[/in_all Is As /in_all/(_ As) sx /Is xs]].
   apply/congr1/le_anti; by rewrite sx xs.
-- by move: h H' {HH}=> [] // ?? /removemintree_None.
-elim: h HH=> // [[ rk [y l t IHh HH]]]. rewrite /findmin.
-case H: (removemintree ((rk, [y | l]) :: t))=> [[[[]]]|] // [EQ].
-by move: EQ H=><- /(removeintree_some HH)[-> /=].
+by move: h H' {HH}=> [] // ?? /removemintree_None.
 Qed.
   
 Fixpoint revh_rank (ts : seq tree) (rk : nat) : heap :=
@@ -744,15 +744,21 @@ rewrite /deletemin. case H: (removemintree h)=> [[[[??? rk]]]|//]
 by rewrite merge_ho_inv.
 Qed.
 
-Theorem deletemin_spec a {h x}: 
-  Some x = findmin h -> (count a (insert x (deletemin h)) = count a h).
+Theorem deletemin_spec {h x}: 
+  Some x = findmin h <-> (count^~ (insert x (deletemin h)) =1 count^~ h).
 Proof.
-rewrite insert_spec /deletemin.
-move: {-2}(removemintree h) (@erefl _ (removemintree h))=>
- [[[[? l ? rk R]]]|/esym/removemintree_None->//]. move: (R).
-rewrite /findmin=> <- [->]. move: R=>  /removemintree_count-/(_ a)<-.
-apply/eqP. rewrite merge_spec addnA addnC eqn_add2l; apply/eqP.
-elim: l rk=> //= ?? IHl rh. by rewrite count_cat addnA IHl /= addn0 tree.countE. 
+split=> [S a|]; first move: S.
+- rewrite insert_spec /deletemin.
+  move: {-2}(removemintree h) (@erefl _ (removemintree h))=>
+  [[[[? l ? rk R]]]|/esym/removemintree_None->//]. move: (R).
+  rewrite /findmin=> <- [->]. move: R=>  /removemintree_count-/(_ a)<-.
+  apply/eqP. rewrite merge_spec addnA addnC eqn_add2l; apply/eqP.
+  elim: l rk=> //= ?? IHl rh. by rewrite count_cat addnA IHl /= addn0 tree.countE.
+move=> H; move: (H (pred1 x)). rewrite insert_spec /= eq_refl.
+elim: h x {H}=> //= [[rk [x t /= l IHh]]]. rewrite /deletemin/findmin.
+move: {-2}(removemintree ((rk, [x | t]) :: l)) (@erefl _ (removemintree ((rk, [x | t]) :: l)))=>
+  [[[[???? /removemintree_count H y]]]|/esym/removemintree_None//].
+rewrite merge_spec.
 Qed.
 
 Theorem deletemin_correct h: 
