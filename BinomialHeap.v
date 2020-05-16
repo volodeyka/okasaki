@@ -686,16 +686,16 @@ by rewrite removemintree_None.
 Qed.
 
 Theorem findmin_spec x h: heap_ordered h -> 
-reflect  (Some x = findmin h) ((x \in h) && all (>= x) h).
+ ((x \in h) && all (>= x) h) <-> (Some x = findmin h).
 Proof.
-move=> HH; apply: Bool.iff_reflect. split=> [|/andP[]]. 
-- elim: h HH=> // [[ rk [y l t IHh HH]]]. rewrite /findmin.
-  case H: (removemintree ((rk, [y | l]) :: t))=> [[[[]]]|] // [EQ].
-  by move: EQ H=><- /(removeintree_some HH)[-> /=].
-rewrite /findmin. case H': (removemintree h)=> [[[[]]]|].
+move=> HH; split=> [/andP[]|].
+- rewrite /findmin. case H': (removemintree h)=> [[[[]]]|].
 - move: H'=> /(removeintree_some HH) => [[/in_all Is As /in_all/(_ As) sx /Is xs]].
   apply/congr1/le_anti; by rewrite sx xs.
-by move: h H' {HH}=> [] // ?? /removemintree_None.
+- by move: h H' {HH}=> [] // ?? /removemintree_None.
+elim: h HH=> // [[ rk [y l t IHh HH]]]. rewrite /findmin.
+case H: (removemintree ((rk, [y | l]) :: t))=> [[[[]]]|] // [EQ].
+by move: EQ H=><- /(removeintree_some HH)[-> /=].
 Qed.
   
 Fixpoint revh_rank (ts : seq tree) (rk : nat) : heap :=
@@ -703,6 +703,13 @@ match ts with
 | [::] => [::]
 | t :: ts' => (revh_rank ts' rk.-1) ++ [:: (rk.-1, t)]
 end.
+
+Lemma revh_rank_spec rk ts x a :
+  tree.count a [x| ts] = (a x) + count a (revh_rank ts rk).
+Proof.
+elim: ts rk=> //= ?? IHts rk. rewrite count_cat tree.countE/= (IHts rk.-1). 
+by ssrnatlia.
+Qed.
 
 Lemma revh_rank_rs_binom_inv x l rk: binom_of_rk rk [x| l] ->
   (rank_sorted (revh_rank l rk)) * (all_trees_binomial (revh_rank l rk)).
@@ -745,20 +752,15 @@ by rewrite merge_ho_inv.
 Qed.
 
 Theorem deletemin_spec {h x}: 
-  Some x = findmin h <-> (count^~ (insert x (deletemin h)) =1 count^~ h).
+  findmin h = some x <-> (count^~ (insert x (deletemin h)) =1 count^~ h).
 Proof.
-split=> [S a|]; first move: S.
-- rewrite insert_spec /deletemin.
-  move: {-2}(removemintree h) (@erefl _ (removemintree h))=>
-  [[[[? l ? rk R]]]|/esym/removemintree_None->//]. move: (R).
-  rewrite /findmin=> <- [->]. move: R=>  /removemintree_count-/(_ a)<-.
-  apply/eqP. rewrite merge_spec addnA addnC eqn_add2l; apply/eqP.
-  elim: l rk=> //= ?? IHl rh. by rewrite count_cat addnA IHl /= addn0 tree.countE.
-move=> H; move: (H (pred1 x)). rewrite insert_spec /= eq_refl.
-elim: h x {H}=> //= [[rk [x t /= l IHh]]]. rewrite /deletemin/findmin.
-move: {-2}(removemintree ((rk, [x | t]) :: l)) (@erefl _ (removemintree ((rk, [x | t]) :: l)))=>
-  [[[[???? /removemintree_count H y]]]|/esym/removemintree_None//].
-rewrite merge_spec.
+case: h=> /=; first (split=> // /(_ (pred1 x)); by rewrite tree.countE/= eq_refl).
+move => //= [rk tr l]. rewrite /deletemin/findmin.
+move: {-2}(removemintree (((rk, tr) :: l))) (@erefl _ (removemintree (((rk, tr) :: l))))=>
+  [[[[y ?? r /removemintree_count/= H]]]|/esym/removemintree_None//]. split; 
+first (case=><- a; rewrite insert_spec merge_spec -H (revh_rank_spec r); by ssrnatlia).
+case E: (pred1 x y)=> /(_ (pred1 x)); first by move: E=> /=/eqP->. 
+rewrite insert_spec merge_spec -H (revh_rank_spec r) E/= eq_refl/=. by ssrnatlia.
 Qed.
 
 Theorem deletemin_correct h: 
@@ -770,8 +772,8 @@ Qed.
 
 Lemma deletemin_size h : size (deletemin h) = (size h).-1.
 Proof.
-case H: (findmin h); last by move: H=> /esym/(findmin_None)->.
-move: (deletemin_spec predT (esym H)). rewrite /size insert_spec/==><-.
+case H: (findmin h); move: H; last by move=> /esym/(findmin_None)->.
+move=> /deletemin_spec/(_ predT). rewrite /size insert_spec/==><-.
 by ssrnatlia.
 Qed.
 
@@ -935,7 +937,7 @@ Proof.
 move=> p. apply_funelim (fromheap h)=> // [[a c b IH]].
 (* case H: findmin (a :: b)=> //. anomaly*)
 move: {-2}(findmin ((a, c) :: b)) (@erefl _ (findmin ((a, c) :: b)))=>
-[d H|/findmin_None//]. by rewrite -(@deletemin_spec _ _ d) // insert_spec /= -IH.
+[d /esym|/findmin_None//] /deletemin_spec/(_ p). by rewrite /= -IH// -insert_spec.
 Qed.
 
 Lemma fromheap_spec2 h: (heap_ordered h) -> sorted <=%O (fromheap h).
@@ -948,7 +950,8 @@ apply/allP=> x. rewrite -has_pred1 has_count -fromheap_spec1.
 move=> /(@leq_trans _ _ (count (pred1 x) (insert d (deletemin ((a, c) :: b))))) Le.
 have: (0 < count (pred1 x) (insert d (deletemin ((a, c) :: b))))%N.
 - apply: Le. rewrite insert_spec; by ssrnatlia.
-rewrite deletemin_spec // -int_conut=> /in_all. by apply.
+move: (esym H)=> /deletemin_spec/(_ (pred1 x))=>->. rewrite -int_conut=> /in_all.
+by apply.
 Qed.
 
 Definition heapsort s := fromheap (fromseq s).
