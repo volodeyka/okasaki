@@ -331,18 +331,17 @@ rewrite is_member=> /or3P[/eqP -> | x'l | x'r]; case eq: (l) IHl BSl min=> IHl B
 - move=> min. by rewrite IHl // -eq.
 - move=> [<-]. apply: ltW. apply: member_LT; first by exact: BSr. by []. by [].
 move=> min. rewrite -eq in min. rewrite -eq in BSl. move: (minint l y min)=> yl.
-apply: ltW. apply: bstlr=> /=. apply/and4P. split; first by exact: GTl.
-exact: LTr. by []. by []. by []. by [].
+apply: ltW. by rewrite (bstlr l r x y x') //= GTl LTr BSl BSr.
 Qed.
 
-Fixpoint treewithoutmin t :=
+Fixpoint deletemin t :=
   if t is T l y r then
     if l is T l' x r' then
-      T (treewithoutmin l) y r
+      T (deletemin l) y r
     else r
   else E.
 
-Arguments treewithoutmin : simpl nomatch.
+Arguments deletemin : simpl nomatch.
 
 Lemma hNleft l r x (bst : BSTOrder (T l x r)) : x \notin l.
 Proof.
@@ -356,7 +355,7 @@ elim: r bst=> // l' IHl' y r' IHr' /= /and4P[] ? /and3P[] ???? /and4P[*].
 by rewrite is_member !negb_or lt_eqF ?IHl' ?IHr' //=; apply/and4P; split.
 Qed.
 
-Lemma nomin t y (bst : BSTOrder t) : omin t = Some y -> y \notin (treewithoutmin t).
+Lemma nomin t y (bst : BSTOrder t) : omin t = Some y -> y \notin (deletemin t).
 Proof.
 elim: t bst=> //= l IHl x r IHr /and4P[GTl LTr BSl BSr] min.
 case eq: (l) IHl BSl min=> [| l' x' r'] //.
@@ -376,7 +375,7 @@ move=> yy. exact: yy. by [].
 Qed.
 
 Lemma stillinbst t x y (bst : BSTOrder t) :
-  omin t = Some y -> x \in t -> x != y -> x \in (treewithoutmin t).
+  omin t = Some y -> x \in t -> x != y -> x \in (deletemin t).
 Proof.
 elim: t bst=> //= l IHl x' r IHr /and4P[GTl LTr BSl BSr min].
 rewrite is_member=> /or3P[/eqP xx' | xl | xr] /eqP neq_xy;
@@ -388,7 +387,7 @@ case eq: l IHl GTl BSl min=> [| l' y' r'] //= IHl ??.
 move=> min. by rewrite is_member xr.
 Qed.
 
-Lemma wasinbst t x : x \in (treewithoutmin t) -> x \in t.
+Lemma wasinbst t x : x \in (deletemin t) -> x \in t.
 Proof.
 elim: t=> // l IHl y r IHr xtt.
 case: l IHl xtt=> /= [_ xr | l' x' r' IHl]; first by rewrite is_member xr.
@@ -412,7 +411,7 @@ move=> H. apply/and3P.
 by split; rewrite (IHl, IHr, H) ?is_member ?eq_refl // => y yt; rewrite H ? is_member ?yt.
 Qed.
 
-Lemma stillbst t (bst : BSTOrder t) : BSTOrder (treewithoutmin t).
+Lemma stillbst t (bst : BSTOrder t) : BSTOrder (deletemin t).
 Proof.
 elim: t bst=> //= l IHl x r IHr /and4P[GTl LTr BSl BSr].
 case: (l) IHl BSl GTl=> //= l' y r' IHl BSl GTl. apply/and4P.
@@ -430,7 +429,7 @@ Fixpoint delete x t :=
       T l y (delete x r)
     else
       if omin r is Some z then
-        T l z (treewithoutmin r)
+        T l z (deletemin r)
       else l
   else E.
 
@@ -465,7 +464,7 @@ move=> mr.
 have: y < m. by move: LTeq LTr=> ->->.
  move=> ym. rewrite lt_eqF //=.
 rewrite (hNleft l r) /=; last by apply/and4P; split.
-rewrite (hNright l (treewithoutmin r)) //= GTl BSl /= stillbst // andbT LTeq=> y' y't.
+rewrite (hNright l (deletemin r)) //= GTl BSl /= stillbst // andbT LTeq=> y' y't.
 move: (LTeq y r) LTr=> ->-> //. by rewrite wasinbst.
 Qed.
 
@@ -501,7 +500,7 @@ rewrite -eq min is_member=> /or3P[/eqP -> |->| xtr] //; first by rewrite [m \in 
 by rewrite [x \in r]wasinbst.
 Qed.
 
-Lemma abs_min x y t (bst: BSTOrder t) : omin t = Some y -> x \in (treewithoutmin t) -> y < x.
+Lemma abs_min x y t (bst: BSTOrder t) : omin t = Some y -> x \in (deletemin t) -> y < x.
 Proof.
 elim: t bst=> //= l IHl x' r IHr /and4P[GTl LTr BSl BSr].
 case eq: l IHl GTl BSl=> [| l' y' r'] IHl GTl BSl /=.
