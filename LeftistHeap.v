@@ -553,8 +553,14 @@ by case: h=> //=???? H; apply merge_LH; move: H=> /case_leftistheap/andP[].
 Qed.
 
 Theorem deletemin_spec h x: 
-  Some x = findmin h -> (count^~ (insert x (deletemin h)) =1 count^~ h).
-Proof. by case: h=>// ????/= [->?]; rewrite insert_spec merge_spec addnA. Qed.
+  Some x = findmin h <-> (count^~ (insert x (deletemin h)) =1 count^~ h).
+Proof.
+
+case: h=> /=; first (split=> // /(_ (pred1 x)) /=; by rewrite eq_refl).
+move=> _ s??; split=> [[-> a]|/(_ (pred1 x))]; 
+rewrite insert_spec merge_spec addnA // -2?addnA=> /eqP; 
+rewrite eqn_add2r/= eq_refl=> /eqP/esym. case E: (s == x)=> //. by rewrite (eqP E).
+Qed.
 
 Lemma deletemin_size h : size (deletemin h) = (size h).-1.
 Proof. case: h=> // n x tl tr; by rewrite ?size_count //= merge_spec. Qed.
