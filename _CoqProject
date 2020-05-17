@@ -2,5 +2,9 @@
 
 -arg -w -arg +default
 -arg -w -arg -notation-overridden
+-arg -w -arg -non-reversible-notation
 
+ssrlia.v
+LeftistHeap.v
+BinomialHeap.v
 BinSearchTree.v

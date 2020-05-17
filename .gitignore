@@ -9,4 +9,5 @@ CoqMakefile.conf
 *.aux
 *.glob
 *.cache
+*.json
 #*#
